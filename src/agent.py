@@ -360,12 +360,22 @@ class Agent:
         """Answer a question about the device with model fallback on rate limit.
 
         Args:
-            question: User's question
+            question: User's question (should be pre-validated)
             context: Optional context for the AI
 
         Returns:
             Response from the AI or error message
         """
+        # Additional safety: Check if question looks like a command
+        if self._looks_like_command(question):
+            return (
+                "⚠️  Your input looks like a direct command.\n"
+                "   Please ask a question instead, like:\n"
+                "   - 'What interfaces are up?'\n"
+                "   - 'Show me the routing table'\n"
+                "   Or use '/cmd <command>' to execute directly."
+            )
+
         # Check rate limit
         if not self._check_rate_limit():
             wait_time = self.rate_limit_window - (time.time() - self.request_times[0])
@@ -516,6 +526,25 @@ class Agent:
 
         # Non-rate-limit error
         return f"❌ Error: {e!s}"
+
+    def _looks_like_command(self, question: str) -> bool:
+        """Check if question looks like a direct command rather than a question."""
+        question_lower = question.lower().strip()
+    
+        # Direct command indicators
+        command_prefixes = ['show ', 'display ', 'get ', 'dir ', 'configure ', 'reload']
+    
+        # If it starts with a command and has no question words, it's likely a command
+        if any(question_lower.startswith(prefix) for prefix in command_prefixes):
+            question_words = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 'can', 'could', 'would', 'should']
+            has_question_word = any(word in question_lower for word in question_words)
+            has_question_mark = '?' in question
+        
+            # If no question indicators, it's probably a direct command
+            if not has_question_word and not has_question_mark:
+                return True
+    
+        return False
 
     def execute_direct_command(self, command: str) -> str:
         """Execute a command directly without AI processing.
