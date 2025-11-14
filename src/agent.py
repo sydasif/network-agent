@@ -14,6 +14,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import create_react_agent
 from typing_extensions import TypedDict
 
+from .audit import AuditLogger, SecurityEventType
 from .network_device import DeviceConnection
 
 
@@ -42,6 +43,7 @@ class Agent:
         temperature: float = 0.1,
         verbose: bool = False,
         timeout: int = 60,
+        audit_logger: AuditLogger = None,
     ) -> None:
         """Initialize the agent.
 
@@ -53,6 +55,7 @@ class Agent:
             temperature: Response randomness (0.0-1.0)
             verbose: Enable detailed logging
             timeout: API request timeout in seconds
+            audit_logger: Audit logger instance for security events
         """
         self.device = device
         self.verbose = verbose
@@ -71,6 +74,9 @@ class Agent:
         self.temperature = temperature
         self.model_fallback_count = 0
         self.model_usage_stats: dict[str, int] = {}
+
+        # Audit logger
+        self.audit_logger = audit_logger
 
         # Initialize LLM with primary model
         self.llm = self._initialize_llm(model_name, temperature, timeout)
@@ -288,7 +294,7 @@ class Agent:
 
             output = self.device.execute_command(command_stripped)
 
-            # Log successful execution to history
+            # Log successful execution to history AND audit log
             self.command_history.append(
                 {
                     "timestamp": timestamp,
@@ -298,6 +304,14 @@ class Agent:
                     "validated": True,
                 }
             )
+
+            # CRITICAL: Log to audit system
+            if self.audit_logger:
+                self.audit_logger.log_command_executed(
+                    command=command_stripped,
+                    success=True,
+                    output_length=len(output),
+                )
 
             return output
 
@@ -320,6 +334,14 @@ class Agent:
             )
             if self.verbose:
                 print(f"[{timestamp}] {error_msg}")
+
+            # CRITICAL: Log to audit system
+            if self.audit_logger:
+                self.audit_logger.log_command_executed(
+                    command=command_stripped,
+                    success=False,
+                    error=str(e),
+                )
             return error_msg
 
         except Exception as e:
@@ -336,6 +358,14 @@ class Agent:
             error_msg = f"⚠ Error executing command: {e!s}"
             if self.verbose:
                 print(f"[{timestamp}] {error_msg}")
+
+            # CRITICAL: Log to audit system
+            if self.audit_logger:
+                self.audit_logger.log_command_executed(
+                    command=command_stripped,
+                    success=False,
+                    error=str(e),
+                )
             return error_msg
 
     def _check_rate_limit(self) -> bool:
@@ -530,20 +560,20 @@ class Agent:
     def _looks_like_command(self, question: str) -> bool:
         """Check if question looks like a direct command rather than a question."""
         question_lower = question.lower().strip()
-    
+
         # Direct command indicators
         command_prefixes = ['show ', 'display ', 'get ', 'dir ', 'configure ', 'reload']
-    
+
         # If it starts with a command and has no question words, it's likely a command
         if any(question_lower.startswith(prefix) for prefix in command_prefixes):
             question_words = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 'can', 'could', 'would', 'should']
             has_question_word = any(word in question_lower for word in question_words)
             has_question_mark = '?' in question
-        
+
             # If no question indicators, it's probably a direct command
             if not has_question_word and not has_question_mark:
                 return True
-    
+
         return False
 
     def execute_direct_command(self, command: str) -> str:

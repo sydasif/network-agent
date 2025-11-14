@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
-# user
+# user addition
 net_lab/
 .env
+logs/
