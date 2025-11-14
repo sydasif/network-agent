@@ -30,10 +30,10 @@ class UserInterface:
         self.assistant = Agent(
             api_key,
             self.device,
-            model_name=settings['model_name'],
-            temperature=settings['temperature'],
-            verbose=settings['verbose'],
-            timeout=settings['timeout'],
+            model_name=settings["model_name"],
+            temperature=settings["temperature"],
+            verbose=settings["verbose"],
+            timeout=settings["timeout"],
         )
 
     def _run_interactive_session(self):
@@ -45,7 +45,7 @@ class UserInterface:
         while True:
             question = input("\n💬 Ask: ").strip()
 
-            if question.lower() in ['quit', 'exit']:
+            if question.lower() in ["quit", "exit"]:
                 break
 
             if not question:

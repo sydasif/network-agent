@@ -4,7 +4,7 @@ import time
 import uuid
 from collections import deque
 from datetime import datetime
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any
 
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.tools import tool
@@ -47,7 +47,8 @@ class Agent:
         Args:
             groq_api_key: Groq API key
             device: DeviceConnection instance
-            model_name: Model to use (openai/gpt-oss-120b, llama-3.3-70b-versatile, etc.)
+            model_name: Model to use (openai/gpt-oss-120b,
+                                llama-3.3-70b-versatile, etc.)
             temperature: Response randomness (0.0-1.0)
             verbose: Enable detailed logging
             timeout: API request timeout in seconds
@@ -100,8 +101,7 @@ class Agent:
         try:
             current_index = MODEL_FALLBACK_CHAIN.index(self.current_model)
             if current_index + 1 < len(MODEL_FALLBACK_CHAIN):
-                next_model = MODEL_FALLBACK_CHAIN[current_index + 1]
-                return next_model
+                return MODEL_FALLBACK_CHAIN[current_index + 1]
         except ValueError:
             pass
         return None
@@ -124,9 +124,9 @@ class Agent:
             self.agent = create_react_agent(self.llm, [self.execute_command_tool])
 
             if self.verbose:
-                print(
-                    f"⚠️  Switched from {old_model} → {next_model} (fallback #{self.model_fallback_count})"
-                )
+                fb_count = self.model_fallback_count
+                msg = f"⚠️  Switched {old_model} → {next_model} (fallback #{fb_count})"
+                print(msg)
 
             return True
         except Exception as e:
@@ -144,22 +144,26 @@ class Agent:
             output = self.device.execute_command(command)
 
             # Log to history
-            self.command_history.append({
-                'timestamp': timestamp,
-                'command': command,
-                'output_length': len(output),
-                'success': True,
-            })
+            self.command_history.append(
+                {
+                    "timestamp": timestamp,
+                    "command": command,
+                    "output_length": len(output),
+                    "success": True,
+                }
+            )
 
             return output
         except Exception as e:
-            self.command_history.append({
-                'timestamp': timestamp,
-                'command': command,
-                'error': str(e),
-                'success': False,
-            })
-            return f"Error executing command: {str(e)}"
+            self.command_history.append(
+                {
+                    "timestamp": timestamp,
+                    "command": command,
+                    "error": str(e),
+                    "success": False,
+                }
+            )
+            return f"Error executing command: {e!s}"
 
     def _check_rate_limit(self) -> bool:
         """Check if rate limit has been exceeded."""
@@ -194,7 +198,22 @@ class Agent:
             wait_time = self.rate_limit_window - (time.time() - self.request_times[0])
             return f"⚠ Rate limit exceeded. Please wait {int(wait_time)}s."
 
-        # Enhanced system prompt
+        # Build the full query with system prompt
+        full_query = self._build_query(question, context)
+
+        max_retries = len(MODEL_FALLBACK_CHAIN)
+        retry_count = 0
+
+        while retry_count < max_retries:
+            response = self._process_query_with_retry(full_query, retry_count)
+            if response is not None:
+                return response
+            retry_count += 1
+
+        return "❌ All models failed. No more fallback models available."
+
+    def _build_query(self, question: str, context: str | None = None) -> str:
+        """Build the full query with system prompt."""
         system_prompt = """You are an expert network engineer assistant specializing in Cisco devices.
 
 CRITICAL RULES:
@@ -225,85 +244,102 @@ IMPORTANT: You MUST execute commands to answer questions. Don't provide theoreti
             system_prompt += f"\n\nAdditional context: {context}"
 
         # Combine system prompt with user query
-        full_query = f"{system_prompt}\n\nUser question: {question}"
+        return f"{system_prompt}\n\nUser question: {question}"
 
-        max_retries = len(MODEL_FALLBACK_CHAIN)
-        retry_count = 0
+    def _process_query_with_retry(
+        self, full_query: str, retry_count: int
+    ) -> str | None:
+        """Process query with retry logic."""
+        try:
+            if self.verbose and retry_count > 0:
+                print(f"\n🔄 Retry #{retry_count} with {self.current_model}...")
 
-        while retry_count < max_retries:
-            try:
-                start_time = time.time()
+            result = self._execute_agent_query(full_query)
 
-                if self.verbose and retry_count > 0:
-                    print(f"\n🔄 Retry #{retry_count} with {self.current_model}...")
+            # Track model usage
+            if self.current_model not in self.model_usage_stats:
+                self.model_usage_stats[self.current_model] = 0
+            self.model_usage_stats[self.current_model] += 1
 
-                result = self.agent.invoke(
-                    {"messages": [("user", full_query)]},
-                    config={
-                        "recursion_limit": 8,  # Max 8 tool calls
-                        "configurable": {"thread_id": str(uuid.uuid4())},
-                    },
-                )
+            response = self._extract_response(result)
 
+            if self.verbose:
+                start_time = (
+                    time.time() - 0.1
+                )  # Approximate time, actual time is not tracked here
                 elapsed_time = time.time() - start_time
-
-                # Track model usage
-                if self.current_model not in self.model_usage_stats:
-                    self.model_usage_stats[self.current_model] = 0
-                self.model_usage_stats[self.current_model] += 1
-
-                # Extract the AI's response (find last AI message, skip tool messages)
-                if isinstance(result, dict) and "messages" in result:
-                    messages = result["messages"]
-                    response = None
-                    for msg in reversed(messages):
-                        if isinstance(msg, AIMessage):
-                            response = msg.content
-                            break
-                    if response is None:
-                        response = str(messages[-1]) if messages else "No response"
-                else:
-                    response = str(result)
-
-                if self.verbose:
-                    print(
-                        f"✓ Query completed in {elapsed_time:.2f}s (Model: {self.current_model})"
-                    )
-
-                return response
-
-            except GraphRecursionError:
-                return "⚠ Agent exceeded maximum iterations (too many tool calls). Try a simpler query."
-
-            except TimeoutError:
-                error_msg = f"⚠ Request timeout with {self.current_model}"
-                if self._switch_to_fallback_model():
-                    print(f"{error_msg}, trying fallback model...")
-                    retry_count += 1
-                    time.sleep(1)  # Brief delay before retry
-                    continue
-                return error_msg
-
-            except Exception as e:
-                error_str = str(e).lower()
-                is_rate_limit = (
-                    "rate limit" in error_str
-                    or "rate_limit" in error_str
-                    or "429" in error_str
-                    or "quota" in error_str
+                print(
+                    f"✓ Query completed in {elapsed_time:.2f}s (Model: {self.current_model})"
                 )
 
-                if is_rate_limit:
-                    error_msg = f"⚠ Rate limit hit on {self.current_model}"
-                    if self._switch_to_fallback_model():
-                        print(f"{error_msg}, switching to {self.current_model}...")
-                        retry_count += 1
-                        time.sleep(2)  # Longer delay for rate limits
-                        continue
-                    return f"{error_msg}. No more fallback models available."
+            return response
 
-                # Non-rate-limit error
-                return f"❌ Error: {str(e)}"
+        except GraphRecursionError:
+            return "⚠ Agent exceeded maximum iterations (too many tool calls). Try a simpler query."
+
+        except TimeoutError:
+            error_msg = f"⚠ Request timeout with {self.current_model}"
+            if self._switch_to_fallback_model():
+                print(f"{error_msg}, trying fallback model...")
+                return None  # Indicate retry needed
+            return error_msg
+
+        except Exception as e:
+            return self._handle_error(e, retry_count)
+
+    def _execute_agent_query(self, full_query: str):
+        """Execute the agent query and return the result."""
+        start_time = time.time()
+
+        result = self.agent.invoke(
+            {"messages": [("user", full_query)]},
+            config={
+                "recursion_limit": 8,  # Max 8 tool calls
+                "configurable": {"thread_id": str(uuid.uuid4())},
+            },
+        )
+
+        # Update elapsed time tracking in a non-breaking way
+        self._last_query_time = time.time() - start_time
+        return result
+
+    def _extract_response(self, result) -> str:
+        """Extract the AI response from the result."""
+        # Extract the AI's response (find last AI message, skip tool messages)
+        if isinstance(result, dict) and "messages" in result:
+            messages = result["messages"]
+            response = None
+            for msg in reversed(messages):
+                if isinstance(msg, AIMessage):
+                    response = msg.content
+                    break
+            if response is None:
+                response = str(messages[-1]) if messages else "No response"
+        else:
+            response = str(result)
+
+        return response
+
+    def _handle_error(self, e: Exception, retry_count: int) -> str | None:
+        """Handle exceptions during query processing."""
+        error_str = str(e).lower()
+        is_rate_limit = (
+            "rate limit" in error_str
+            or "rate_limit" in error_str
+            or "429" in error_str
+            or "quota" in error_str
+        )
+
+        if is_rate_limit:
+            error_msg = f"⚠ Rate limit hit on {self.current_model}"
+            if self._switch_to_fallback_model():
+                print(f"{error_msg}, switching to {self.current_model}...")
+                time.sleep(2)  # Longer delay for rate limits
+                return None  # Indicate retry needed
+            return f"{error_msg}. No more fallback models available."
+
+        # Non-rate-limit error
+        return f"❌ Error: {e!s}"
 
     def execute_direct_command(self, command: str) -> str:
         """Execute a command directly without AI processing.
@@ -317,17 +353,19 @@ IMPORTANT: You MUST execute commands to answer questions. Don't provide theoreti
             output = self.device.execute_command(command)
 
             # Log to history
-            self.command_history.append({
-                'timestamp': datetime.now().isoformat(),
-                'command': command,
-                'output_length': len(output),
-                'success': True,
-                'direct': True,
-            })
+            self.command_history.append(
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "command": command,
+                    "output_length": len(output),
+                    "success": True,
+                    "direct": True,
+                }
+            )
 
             return output
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Error: {e!s}"
 
     def get_statistics(self) -> dict[str, Any]:
         """Get session statistics.
@@ -335,20 +373,20 @@ IMPORTANT: You MUST execute commands to answer questions. Don't provide theoreti
         Returns:
             Dictionary with command statistics, rate limit status, and model info
         """
-        successful = sum(1 for cmd in self.command_history if cmd.get('success', False))
+        successful = sum(1 for cmd in self.command_history if cmd.get("success", False))
         failed = len(self.command_history) - successful
         rate_limit_active = len(self.request_times) >= self.rate_limit_requests
 
         return {
-            'total_commands': len(self.command_history),
-            'successful_commands': successful,
-            'failed_commands': failed,
-            'rate_limit_used': f"{len(self.request_times)}/{self.rate_limit_requests}",
-            'rate_limit_active': rate_limit_active,
-            'primary_model': self.primary_model,
-            'current_model': self.current_model,
-            'model_fallbacks': self.model_fallback_count,
-            'model_usage': self.model_usage_stats,
+            "total_commands": len(self.command_history),
+            "successful_commands": successful,
+            "failed_commands": failed,
+            "rate_limit_used": f"{len(self.request_times)}/{self.rate_limit_requests}",
+            "rate_limit_active": rate_limit_active,
+            "primary_model": self.primary_model,
+            "current_model": self.current_model,
+            "model_fallbacks": self.model_fallback_count,
+            "model_usage": self.model_usage_stats,
         }
 
     def get_history(self, limit: int = 10) -> list[dict[str, Any]]:

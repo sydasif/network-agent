@@ -13,18 +13,18 @@ class DeviceConnection:
     def connect(self, hostname: str, username: str, password: str):
         """Connect to a network device."""
         device_config = {
-            'device_type': 'cisco_ios',
-            'host': hostname,
-            'username': username,
-            'password': password,
-            'timeout': 30,
+            "device_type": "cisco_ios",
+            "host": hostname,
+            "username": username,
+            "password": password,
+            "timeout": 30,
         }
         try:
             self.connection = ConnectHandler(**device_config)
             print(f"✓ Connected to {hostname}")
         except Exception as e:
             error_msg = str(e).lower()
-            if 'authentication' in error_msg or 'auth' in error_msg:
+            if "authentication" in error_msg or "auth" in error_msg:
                 raise ConnectionError(
                     f"\n❌ SSH Authentication Failed for {hostname}\n"
                     f"   Please verify:\n"
@@ -34,8 +34,8 @@ class DeviceConnection:
                     f"   • Device allows SSH access\n"
                     f"   • Device is running (ping {hostname} first)\n"
                     f"\n   Try manually: ssh {username}@{hostname}"
-                )
-            if 'timeout' in error_msg or 'refused' in error_msg:
+                ) from e
+            if "timeout" in error_msg or "refused" in error_msg:
                 raise ConnectionError(
                     f"\n❌ Connection Timeout/Refused for {hostname}\n"
                     f"   Please verify:\n"
@@ -44,12 +44,12 @@ class DeviceConnection:
                     f"   • SSH is enabled on device\n"
                     f"   • Firewall allows SSH (port 22)\n"
                     f"   • Device is powered on"
-                )
+                ) from e
             raise ConnectionError(
-                f"\n❌ Connection Failed: {str(e)}\n"
+                f"\n❌ Connection Failed: {e!s}\n"
                 f"   Device: {hostname}\n"
                 f"   Check device accessibility and credentials"
-            )
+            ) from e
 
     def disconnect(self):
         """Disconnect from the device."""
@@ -63,7 +63,6 @@ class DeviceConnection:
             return "Error: Not connected to device"
 
         try:
-            output = self.connection.send_command(command)
-            return output
+            return self.connection.send_command(command)
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Error: {e!s}"
