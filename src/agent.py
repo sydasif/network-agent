@@ -136,35 +136,186 @@ class Agent:
             return False
 
     def _execute_device_command(self, command: str) -> str:
-        """Execute a command on the device (used by AI)."""
+        """Execute a command on the device (used by AI) with safety constraints.
+
+        Only allows read-only commands to prevent accidental or malicious
+        configuration changes.
+
+        Args:
+            command: Command to execute
+
+        Returns:
+            Command output or error message if blocked
+        """
+        # Normalize command for validation
+        command_stripped = command.strip()
+        command_lower = command_stripped.lower()
+
+        # Run validation checks
+        validation_result = self._validate_command(command_stripped, command_lower)
+        if validation_result is not True:  # If validation failed, return error message
+            return validation_result
+
+        # Command passed all safety checks - execute it
+        return self._execute_validated_command(command_stripped)
+
+    def _validate_command(
+        self, command_stripped: str, command_lower: str
+    ) -> str | bool:
+        """Validate command against security constraints.
+
+        Args:
+            command_stripped: Command with whitespace stripped
+            command_lower: Lowercase version of command
+
+        Returns:
+            True if valid, error message string if blocked
+        """
+        # Check if command is empty
+        if not command_stripped:
+            return "⚠ Error: Empty command received"
+
+        # Check for blocked keywords (most critical check)
+        blocked_result = self._check_blocked_keywords(command_stripped, command_lower)
+        if blocked_result:
+            return blocked_result
+
+        # Check if command starts with allowed prefix
+        prefix_result = self._check_allowed_prefix(command_stripped, command_lower)
+        if prefix_result:
+            return prefix_result
+
+        # Check for command chaining attempts
+        chaining_result = self._check_command_chaining(command_stripped, command_lower)
+        if chaining_result:
+            return chaining_result
+
+        return True  # All checks passed
+
+    def _check_blocked_keywords(
+        self, command_stripped: str, command_lower: str
+    ) -> str | None:
+        """Check command for blocked keywords."""
+        # CRITICAL SECURITY: Block dangerous commands
+        BLOCKED_KEYWORDS = [
+            "reload",  # Reboot device
+            "write",  # Save config changes
+            "erase",  # Delete configuration
+            "delete",  # Delete files
+            "no ",  # Negate/remove configs
+            "clear",  # Clear counters/logs
+            "configure",  # Enter config mode
+            "conf t",  # Config terminal
+            "config terminal",  # Config terminal (full)
+            "enable",  # Elevate privileges
+            "copy",  # Copy files (can overwrite)
+            "format",  # Format filesystem
+            "shutdown",  # Shutdown interfaces
+            "boot",  # Boot system commands
+            "username",  # User management
+            "password",  # Password changes
+            "crypto",  # Crypto operations
+            "key",  # Key management
+            "certificate",  # Certificate management
+        ]
+
+        for blocked in BLOCKED_KEYWORDS:
+            if blocked in command_lower:
+                msg = (
+                    f"⚠ BLOCKED: '{command_stripped}'\n"
+                    f"   Reason: Contains blocked keyword '{blocked}'\n"
+                    f"   Only read-only commands are allowed for safety."
+                )
+                if self.verbose:
+                    print(f"[SECURITY] {msg}")
+                return msg
+        return None
+
+    def _check_allowed_prefix(
+        self, command_stripped: str, command_lower: str
+    ) -> str | None:
+        """Check if command starts with allowed prefix."""
+        # CRITICAL SECURITY: Whitelist only safe read-only commands
+        ALLOWED_PREFIXES = [
+            "show",  # Cisco IOS show commands
+            "display",  # Some vendor alternatives
+            "get",  # Get information commands
+            "dir",  # Directory listing
+            "more",  # View file contents
+            "verify",  # Verify operations (read-only)
+        ]
+
+        is_allowed = any(
+            command_lower.startswith(prefix) for prefix in ALLOWED_PREFIXES
+        )
+
+        if not is_allowed:
+            allowed_str = ", ".join(ALLOWED_PREFIXES)
+            msg = (
+                f"⚠ BLOCKED: '{command_stripped}'\n"
+                f"   Reason: Does not start with allowed prefix\n"
+                f"   Allowed prefixes: {allowed_str}\n"
+                f"   Only read-only commands are permitted."
+            )
+            if self.verbose:
+                print(f"[SECURITY] {msg}")
+            return msg
+        return None
+
+    def _check_command_chaining(
+        self, command_stripped: str, command_lower: str
+    ) -> str | None:
+        """Check for command chaining attempts."""
+        if ";" in command_stripped or "|" in command_stripped:
+            # Allow pipes to 'include' and 'begin' (common for filtering)
+            if "| include" not in command_lower and "| begin" not in command_lower:
+                msg = (
+                    f"⚠ BLOCKED: '{command_stripped}'\n"
+                    f"   Reason: Command chaining detected\n"
+                    f"   Only single commands allowed (pipes to 'include' or 'begin' are OK)."
+                )
+                if self.verbose:
+                    print(f"[SECURITY] {msg}")
+                return msg
+        return None
+
+    def _execute_validated_command(self, command_stripped: str) -> str:
+        """Execute a command that has passed all validation checks."""
         timestamp = datetime.now().isoformat()
         try:
             if self.verbose:
-                print(f"[{timestamp}] Executing: {command}")
+                print(f"[{timestamp}] ✅ Executing (validated): {command_stripped}")
 
-            output = self.device.execute_command(command)
+            output = self.device.execute_command(command_stripped)
 
-            # Log to history
+            # Log successful execution to history
             self.command_history.append(
                 {
                     "timestamp": timestamp,
-                    "command": command,
+                    "command": command_stripped,
                     "output_length": len(output),
                     "success": True,
+                    "validated": True,
                 }
             )
 
             return output
+
         except Exception as e:
+            # Log failed execution to history
             self.command_history.append(
                 {
                     "timestamp": timestamp,
-                    "command": command,
+                    "command": command_stripped,
                     "error": str(e),
                     "success": False,
+                    "validated": True,
                 }
             )
-            return f"Error executing command: {e!s}"
+            error_msg = f"⚠ Error executing command: {e!s}"
+            if self.verbose:
+                print(f"[{timestamp}] {error_msg}")
+            return error_msg
 
     def _check_rate_limit(self) -> bool:
         """Check if rate limit has been exceeded."""
