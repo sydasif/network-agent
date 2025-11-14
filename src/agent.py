@@ -301,6 +301,27 @@ class Agent:
 
             return output
 
+        except ConnectionError as e:  # Catch specific connection errors
+            # Log failed execution to history
+            self.command_history.append(
+                {
+                    "timestamp": timestamp,
+                    "command": command_stripped,
+                    "error": str(e),
+                    "success": False,
+                    "validated": True,
+                }
+            )
+            # Return clear message to AI that connection is dead
+            error_msg = (
+                f"❌ Connection Error: {e!s}\n\n"
+                "The device connection has failed. "
+                "Please inform the user they need to restart the application."
+            )
+            if self.verbose:
+                print(f"[{timestamp}] {error_msg}")
+            return error_msg
+
         except Exception as e:
             # Log failed execution to history
             self.command_history.append(
@@ -519,6 +540,25 @@ class Agent:
             )
 
             return output
+        except ConnectionError as e:
+            # Log failed execution to history
+            self.command_history.append(
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "command": command,
+                    "error": str(e),
+                    "success": False,
+                    "direct": True,
+                }
+            )
+            error_msg = (
+                f"❌ Connection Error: {e!s}\n\n"
+                "The device connection has failed. "
+                "Please inform the user they need to restart the application."
+            )
+            if self.verbose:
+                print(error_msg)
+            return error_msg
         except Exception as e:
             return f"Error: {e!s}"
 
