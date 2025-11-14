@@ -61,11 +61,88 @@ GROQ_API_KEY=your_groq_api_key_here
 DEVICE_PASSWORD=your_device_password  # Optional
 ```
 
+**Configuration Variables:**
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `GROQ_API_KEY` | ✅ Yes | Free API key from Groq | `gsk_abc123...` |
+| `DEVICE_PASSWORD` | ❌ Optional | Device SSH password (prompted if not set) | `MyPassword123` |
+
+**Getting Groq API Key:**
+
+1. Visit <https://console.groq.com/keys>
+2. Sign up (free account)
+3. Create new API key
+4. Copy to `.env` file
+
+**Alternative: Set Environment Variables (Linux/Mac):**
+
+```bash
+export GROQ_API_KEY="your_key_here"
+export DEVICE_PASSWORD="your_password"
+uv run main.py
+```
+
+**For Windows (PowerShell):**
+
+```powershell
+$env:GROQ_API_KEY="your_key_here"
+$env:DEVICE_PASSWORD="your_password"
+uv run main.py
+```
+
 ### 4. Run
 
 ```bash
 uv run main.py
 ```
+
+### 5. Configure Settings (Interactive Menu)
+
+Once running, you can customize the agent behavior:
+
+```bash
+💬 Ask: /settings
+
+============================================================
+Settings Menu
+============================================================
+
+1. Model Selection
+   Current: openai/gpt-oss-120b
+   Options:
+   - openai/gpt-oss-120b (recommended - best for networking)
+   - llama-3.3-70b-versatile
+   - llama-3.1-8b-instant
+
+2. Temperature
+   Current: 0.1 (more deterministic)
+   Range: 0.0 (deterministic) to 1.0 (creative)
+
+3. Platform Type
+   Current: Cisco IOS
+   Options: Cisco IOS, Cisco NX-OS, Cisco IOS-XR
+
+4. Verbose Mode
+   Current: OFF
+   Options: ON/OFF (detailed logging)
+
+5. API Timeout
+   Current: 60 seconds
+   Range: 10-300 seconds
+
+6. Return to Main Menu
+```
+
+**Configuration Options Explained:**
+
+| Setting | Effect | Recommendation |
+|---------|--------|-----------------|
+| **Model** | Speed & accuracy trade-off | Use `llama-3.3-70b` for best results |
+| **Temperature** | Response creativity vs consistency | 0.1 for networking tasks (predictable) |
+| **Platform** | Device-specific command formatting | Match your device type |
+| **Verbose** | Debug logging for troubleshooting | OFF normally, ON for debugging |
+| **Timeout** | Max wait for API response (seconds) | 60 for most cases, 120 for complex queries |
 
 ## 📁 Project Structure
 
@@ -201,18 +278,26 @@ The device has been running for:
 ### Core Dependencies
 
 - **Netmiko** (4.6.0+) — SSH device connection and command execution
-- **LangChain** (0.1+) — AI framework and agent orchestration
-- **LangGraph** (1.0+) — Agent state management
-- **Groq** (0.33+) — LLM API client
+- **LangChain** (0.3.0+) — Modern AI framework and agent orchestration with improved type hints
+- **LangGraph** (1.0.3+) — Graph-based agent runtime with ReAct pattern and recursion limits
+- **Groq** (0.33+) — LLM API client with rate limiting (30 req/60s)
 - **python-dotenv** (1.2+) — Environment variable management
 
 ### Models
 
-- **Llama 3.3-70B** (via Groq) — Fast, free LLM inference
+- **GPT-OSS 120B** (via Groq) — Best for networking tasks (500 tps, 120B parameters)
+  - 65K context window for large command outputs
+  - Excellent reasoning for network troubleshooting
+  - **Recommended for production**
+
+**Alternative models:**
+
+- **Llama 3.3 70B** — High quality, good balance
+- **Llama 3.1 8B** — Fast & economical for simple queries
 
 ### Python Version
 
-- Python 3.12+ (uses modern type hints and syntax)
+- Python 3.12+ (uses modern type hints, TypedDict, and async/await patterns)
 
 ## 🔒 Security Considerations
 
@@ -237,7 +322,66 @@ __pycache__/
 .DS_Store
 ```
 
-## ⚠️ Troubleshooting
+## 🔄 Model Fallback System
+
+The agent automatically handles rate limiting and API errors by switching between models:
+
+**Fallback Chain (in priority order):**
+
+1. **openai/gpt-oss-120b** (Primary) — Best for networking, 120B parameters
+2. **llama-3.3-70b-versatile** (Fallback 1) — High quality alternative, 70B parameters
+3. **llama-3.1-8b-instant** (Fallback 2) — Fast & economical, 8B parameters
+
+**How it works:**
+
+```text
+User Query
+    ↓
+Try Primary Model (openai/gpt-oss-120b)
+    ├─ Success? → Return response
+    ├─ Rate Limit? → Wait 2s, Switch to Fallback 1
+    └─ Timeout? → Wait 1s, Switch to Fallback 1
+        ↓
+Try Fallback 1 (llama-3.3-70b-versatile)
+    ├─ Success? → Return response
+    ├─ Rate Limit? → Wait 2s, Switch to Fallback 2
+    └─ Timeout? → Wait 1s, Switch to Fallback 2
+        ↓
+Try Fallback 2 (llama-3.1-8b-instant)
+    ├─ Success? → Return response
+    └─ Failure? → Return error message
+```
+
+**Tracking Model Usage:**
+
+Use `/stats` command to see which models were used:
+
+```bash
+💬 Ask: /stats
+
+📊 Session Statistics:
+   Total commands: 5
+   Successful: 5
+   Failed: 0
+   Rate limit status: 3/30
+   Rate limit active: false
+
+🤖 Model Information:
+   Primary model: openai/gpt-oss-120b
+   Current model: llama-3.3-70b-versatile
+   Fallbacks used: 1
+   Model usage:
+      - openai/gpt-oss-120b: 3 requests
+      - llama-3.3-70b-versatile: 2 requests
+```
+
+**Retry Strategy:**
+
+- **Rate Limit Error** → Wait 2 seconds, try next model
+- **Timeout Error** → Wait 1 second, try next model
+- **Other Errors** → Return error message immediately
+
+## 🎯 Rate Limiting
 
 ### Connection Timeout
 
@@ -290,19 +434,33 @@ Error: Invalid command
 - Check device capabilities
 - Some devices need privilege level
 
-## 📈 Next Steps & Enhancements
+## 📈 Recent Enhancements (v0.1.0)
+
+✅ **Completed in Latest Update:**
+
+- [x] Type hints on all methods for IDE autocomplete
+- [x] AgentState TypedDict for type-safe state management
+- [x] Recursion limits (max 8 tool calls) preventing infinite loops
+- [x] Improved statistics tracking (successful/failed commands, rate limits)
+- [x] Proper message extraction with explicit type checking
+- [x] Enhanced error handling (GraphRecursionError, TimeoutError, rate limiting)
+- [x] Thread-based agent state persistence
+- [x] Special commands: `/cmd`, `/stats`, `/history`, `/help`, `/quit`
+
+## 📋 Planned Enhancements (Priority 3 - Optional)
 
 Potential improvements:
 
+- [ ] Graph visualization - `agent.get_graph().draw_mermaid()` for debugging
+- [ ] Async support - `answer_question_async()` for parallel device operations
+- [ ] Streaming responses - Real-time feedback for long operations
 - [ ] Support multiple device types (NX-OS, IOS-XR, ASA)
-- [ ] Configuration change capabilities
+- [ ] Configuration change capabilities (with safety constraints)
 - [ ] Multi-device management and queries
 - [ ] Web UI dashboard
 - [ ] Scheduled automated health checks
 - [ ] Alert notifications and reporting
-- [ ] Command history and logging
 - [ ] Custom system prompts per device type
-- [ ] Parallel device queries
 - [ ] Integration with monitoring systems
 
 ## 🤝 Contributing
