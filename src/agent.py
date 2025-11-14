@@ -16,6 +16,7 @@ from typing_extensions import TypedDict
 
 from .network_device import DeviceConnection
 
+
 # Model fallback chain - order matters (primary to fallback)
 MODEL_FALLBACK_CHAIN = [
     "openai/gpt-oss-120b",  # Primary (best for networking)
@@ -214,31 +215,21 @@ class Agent:
 
     def _build_query(self, question: str, context: str | None = None) -> str:
         """Build the full query with system prompt."""
-        system_prompt = """You are an expert network engineer assistant specializing in Cisco devices.
+        system_prompt = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
 
-CRITICAL RULES:
-1. ALWAYS use the execute_show_command tool to run commands
-2. DO NOT make assumptions about command output
-3. Run commands and analyze their actual output
-4. If a command fails, try an alternative command
+        Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
+        You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
 
-Guidelines:
-- Use execute_show_command tool to run Cisco CLI commands
-- Run multiple commands if needed to fully answer the question
-- Provide clear, concise explanations
-- Format output in a readable way
-- Highlight important findings (errors, warnings, issues)
+        After executing all necessary commands, provide a clear summary of the results to answer the user's question.
 
-Common command patterns:
-- VLANs: show vlan brief, show vlan
-- Interfaces: show ip interface brief, show interfaces status
-- Routing: show ip route, show ip protocols
-- Version: show version
-- Config: show running-config (specific sections)
-- Logs: show logging
-- Neighbors: show cdp neighbors, show lldp neighbors
+        Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
 
-IMPORTANT: You MUST execute commands to answer questions. Don't provide theoretical answers."""
+        Format your responses in a structured way for network data:
+        - Use bullet points for lists of items (interfaces, neighbors, etc.)
+        - Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
+        - Highlight important values with bold (e.g., **Process ID: 1**)
+        - For tables of data, use markdown table format
+        - Organize information by category (Configuration, Status, Issues, etc.)"""
 
         if context:
             system_prompt += f"\n\nAdditional context: {context}"
@@ -313,8 +304,21 @@ IMPORTANT: You MUST execute commands to answer questions. Don't provide theoreti
                 if isinstance(msg, AIMessage):
                     response = msg.content
                     break
-            if response is None:
-                response = str(messages[-1]) if messages else "No response"
+
+            # If there's no AI message but there were tool messages,
+            # the AI may have needed more steps to process the request
+            if response is None or response == "":
+                # Look for the last AI message that might have requested more steps
+                for msg in reversed(messages):
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        # If the last message had tool calls but no response,
+                        # it means the AI needed more steps
+                        return "Sorry, need more steps to process this request."
+                    if isinstance(msg, AIMessage) and msg.content:
+                        response = msg.content
+                        break
+                if response is None or response == "":
+                    return "Sorry, need more steps to process this request."
         else:
             response = str(result)
 
