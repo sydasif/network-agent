@@ -2,6 +2,7 @@
 
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
+import threading
 
 
 class ConnectionState:
@@ -23,6 +24,9 @@ class DeviceConnection:
         self.connection_attempts = 0
         self.max_reconnect_attempts = 3
 
+        # CRITICAL: Add thread lock to prevent concurrent reconnection attempts
+        self._connection_lock = threading.Lock()
+
     def connect(self, hostname: str, username: str, password: str):
         """Connect to a network device with proper error handling.
 
@@ -40,9 +44,12 @@ class DeviceConnection:
             "username": username,
             "password": password,
             "timeout": 30,
-            "session_timeout": 60,  # Add session timeout
-            "auth_timeout": 30,     # Add auth timeout
-            "banner_timeout": 15,   # Add banner timeout
+            "session_timeout": 60,
+            "auth_timeout": 30,
+            "banner_timeout": 15,
+            # CRITICAL: Add fast_cli to prevent pattern matching issues with piped commands
+            "fast_cli": False,  # Disable fast mode for better reliability
+            "global_delay_factor": 2,  # Increase delay for slow devices
         }
 
         try:
@@ -64,7 +71,6 @@ class DeviceConnection:
                 f"   • Device allows SSH access\n"
                 f"   • Device is running (ping {hostname} first)\n"
                 f"\n   Try manually: ssh {username}@{hostname}\n"
-                # CRITICAL: DO NOT include actual password or password hints
             ) from e
 
         except NetmikoTimeoutException as e:
@@ -99,9 +105,9 @@ class DeviceConnection:
             return False
 
         try:
-            # Send a simple command to check if connection is alive
-            # Use a fast command with short timeout
-            self.connection.send_command("show clock", read_timeout=5)
+            # CRITICAL: Use a very simple command with generous timeout
+            # Don't use piped commands for liveness check
+            self.connection.send_command("show clock", read_timeout=10, expect_string=r"#")
             return True
         except Exception:
             return False
@@ -112,48 +118,56 @@ class DeviceConnection:
         Returns:
             True if reconnection successful, False otherwise
         """
-        if not self.device_config:
-            return False
+        # CRITICAL: Use thread lock to prevent multiple simultaneous reconnection attempts
+        with self._connection_lock:
+            # Check if another thread already reconnected
+            if self._is_connection_alive():
+                return True
 
-        if self.connection_attempts >= self.max_reconnect_attempts:
-            return False
+            if not self.device_config:
+                return False
 
-        self.connection_attempts += 1
+            if self.connection_attempts >= self.max_reconnect_attempts:
+                return False
 
-        try:
-            print(f"⚠️  Connection lost. Attempting reconnect ({self.connection_attempts}/{self.max_reconnect_attempts})...")
+            self.connection_attempts += 1
 
-            # Close dead connection
-            if self.connection:
-                try:
-                    self.connection.disconnect()
-                except Exception:
-                    pass
+            try:
+                print(f"⚠️  Connection lost. Attempting reconnect ({self.connection_attempts}/{self.max_reconnect_attempts})...")
 
-            # Attempt new connection
-            self.connection = ConnectHandler(**self.device_config)
-            self.state = ConnectionState.CONNECTED
-            self.last_error = None
-            print(f"✓ Reconnected successfully")
-            return True
+                # Close dead connection
+                if self.connection:
+                    try:
+                        self.connection.disconnect()
+                    except Exception:
+                        pass
 
-        except Exception as e:
-            self.state = ConnectionState.FAILED
-            self.last_error = f"Reconnect failed: {e!s}"
-            print(f"❌ Reconnect attempt {self.connection_attempts} failed: {e!s}")
-            return False
+                # Attempt new connection
+                self.connection = ConnectHandler(**self.device_config)
+                self.state = ConnectionState.CONNECTED
+                self.last_error = None
+                self.connection_attempts = 0  # Reset on success
+                print(f"✓ Reconnected successfully")
+                return True
+
+            except Exception as e:
+                self.state = ConnectionState.FAILED
+                self.last_error = f"Reconnect failed: {e!s}"
+                print(f"❌ Reconnect attempt {self.connection_attempts} failed: {e!s}")
+                return False
 
     def disconnect(self):
         """Disconnect from the device."""
-        if self.connection:
-            try:
-                self.connection.disconnect()
-                print("✓ Disconnected")
-            except Exception as e:
-                print(f"⚠️  Disconnect error (non-critical): {e!s}")
-            finally:
-                self.connection = None
-                self.state = ConnectionState.DISCONNECTED
+        with self._connection_lock:
+            if self.connection:
+                try:
+                    self.connection.disconnect()
+                    print("✓ Disconnected")
+                except Exception as e:
+                    print(f"⚠️  Disconnect error (non-critical): {e!s}")
+                finally:
+                    self.connection = None
+                    self.state = ConnectionState.DISCONNECTED
 
     def execute_command(self, command: str) -> str:
         """Execute a command on the device with connection state management.
@@ -174,9 +188,9 @@ class DeviceConnection:
                 "   Please restart the application and connect again"
             )
 
-        # Check if connection is still alive
+        # Check if connection is still alive (but don't reconnect yet)
         if not self._is_connection_alive():
-            # Attempt to reconnect
+            # Attempt to reconnect (thread-safe)
             if not self._attempt_reconnect():
                 raise ConnectionError(
                     f"❌ Connection lost and reconnection failed\n"
@@ -187,17 +201,34 @@ class DeviceConnection:
 
         # Execute command with proper error handling
         try:
-            output = self.connection.send_command(command, read_timeout=30)
+            # CRITICAL: Add expect_string parameter to help Netmiko find the prompt
+            # Increase read_timeout for piped commands (they can be slow)
+            output = self.connection.send_command(
+                command,
+                read_timeout=60,  # Increase from 30 to 60 for complex commands
+                expect_string=r"#",  # Explicitly tell Netmiko to look for #
+            )
             self.connection_attempts = 0  # Reset counter on success
             return output
 
         except NetmikoTimeoutException as e:
             self.state = ConnectionState.FAILED
-            raise ConnectionError(
-                f"❌ Command execution timeout\n"
-                f"   Command: {command}\n"
-                f"   Device may be unresponsive or command takes too long"
-            ) from e
+            # CRITICAL: Check if it's a pattern detection issue vs real timeout
+            error_str = str(e).lower()
+            if "pattern not detected" in error_str or "pattern" in error_str:
+                raise ConnectionError(
+                    f"❌ Command pattern matching failed\n"
+                    f"   Command: {command}\n"
+                    f"   This usually happens with piped commands (|)\n"
+                    f"   Try: Use simpler commands or increase timeout\n"
+                    f"   Error: {e!s}"
+                ) from e
+            else:
+                raise ConnectionError(
+                    f"❌ Command execution timeout\n"
+                    f"   Command: {command}\n"
+                    f"   Device may be unresponsive or command takes too long"
+                ) from e
 
         except Exception as e:
             self.state = ConnectionState.FAILED

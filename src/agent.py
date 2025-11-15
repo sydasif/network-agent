@@ -276,17 +276,35 @@ class Agent:
         self, command_stripped: str, command_lower: str
     ) -> str | None:
         """Check for command chaining attempts."""
-        if ";" in command_stripped or "|" in command_stripped:
-            # Allow pipes to 'include' and 'begin' (common for filtering)
-            if "| include" not in command_lower and "| begin" not in command_lower:
+        if ";" in command_stripped:
+            # ALWAYS block semicolon command chaining
+            msg = (
+                f"⚠ BLOCKED: '{command_stripped}'\n"
+                f"   Reason: Semicolon command chaining detected\n"
+                f"   Only single commands allowed."
+            )
+            if self.verbose:
+                print(f"[SECURITY] {msg}")
+            return msg
+
+        # Check for pipe command chaining
+        if "|" in command_stripped:
+            # Allow ONLY 'include', 'begin', 'section', and 'exclude' (common Cisco filters)
+            allowed_pipe_commands = ['| include', '| begin', '| section', '| exclude']
+
+            # Check if pipe is followed by allowed command
+            has_allowed_pipe = any(allowed in command_lower for allowed in allowed_pipe_commands)
+
+            if not has_allowed_pipe:
                 msg = (
                     f"⚠ BLOCKED: '{command_stripped}'\n"
-                    f"   Reason: Command chaining detected\n"
-                    f"   Only single commands allowed (pipes to 'include' or 'begin' are OK)."
+                    f"   Reason: Unsupported pipe command\n"
+                    f"   Allowed: | include, | begin, | section, | exclude"
                 )
                 if self.verbose:
                     print(f"[SECURITY] {msg}")
                 return msg
+
         return None
 
     def _execute_validated_command(self, command_stripped: str) -> str:
