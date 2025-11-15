@@ -32,7 +32,7 @@ The AI agent will:
 ## 📋 Prerequisites
 
 - Python 3.12+
-- `uv` package manager (optional but recommended)
+- `uv` package manager (optional but recommended). Install with `pip install uv`.
 - Groq API key (free at <https://console.groq.com/keys>)
 - Network device with SSH access (Cisco IOS)
 
@@ -47,10 +47,25 @@ cd network-agent
 
 ### 2. Install Dependencies
 
+Create a virtual environment and install the project's dependencies using `uv`.
+
 ```bash
-uv sync
-# or: pip install -r requirements.txt
+# Create a virtual environment
+uv venv
+
+# Activate the virtual environment
+# On macOS/Linux:
+source .venv/bin/activate
+# On Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+
+# Install the core application dependencies
+uv pip install .
+
+# To include dependencies for the examples, run:
+uv pip install ".[examples]"
 ```
+This command reads the `pyproject.toml` file and installs the necessary packages into your virtual environment.
 
 ### 3. Configure Environment
 
@@ -509,13 +524,39 @@ The device has been running for:
 
 ## 🔧 Technical Stack
 
+The project is built with a modern, modular, and type-safe Python stack, with dependencies managed through `pyproject.toml`.
+
 ### Core Dependencies
 
-- **Netmiko** (4.6.0+) — SSH device connection and command execution
-- **LangChain** (0.3.0+) — Modern AI framework and agent orchestration with improved type hints
-- **LangGraph** (1.0.3+) — Graph-based agent runtime with ReAct pattern and recursion limits
-- **Groq** (0.33+) — LLM API client with rate limiting (30 req/60s)
-- **python-dotenv** (1.2+) — Environment variable management
+These libraries are essential for the core application to run.
+
+| Library | Version | Role |
+|---|---|---|
+| **Python** | `>=3.12` | The core programming language, utilizing modern features like type hints. |
+| **LangChain** | `>=0.3.0` | A framework for developing applications powered by language models. |
+| **LangGraph** | `>=1.0.3` | Used to build reliable, stateful AI agents with cycles and recursion limits. |
+| **Groq** | `>=0.33.0` | The official client for accessing the high-speed Groq LLM inference engine. |
+| **Netmiko** | `>=4.6.0` | A multi-vendor library for simplified SSH connections to network devices. |
+| **Pydantic** | `>=2.0.0` | Provides robust, type-safe data validation for the unified configuration system. |
+| **PyYAML** | `>=6.0` | Used for safely parsing the `config.yaml` file. |
+| **python-dotenv**| `>=1.2.1` | Manages environment variables by loading them from the `.env` file. |
+
+### Development and Testing
+
+These libraries are used for code quality, testing, and development workflows.
+
+| Library | Version | Role |
+|---|---|---|
+| **Pytest** | `>=9.0.1` | The framework used for running the comprehensive suite of unit and integration tests. |
+| **Ruff** | `>=0.14.5` | An extremely fast Python linter and code formatter used to maintain code quality. |
+
+### Example Dependencies
+
+These libraries are only required to run the example applications in the `examples/` directory and can be installed with `uv pip install ".[examples]"`.
+
+| Library | Version | Role |
+|---|---|---|
+| **Flask** | `>=3.0.0` | A lightweight web framework used to demonstrate API endpoints for health and metrics. |
 
 ### Models
 
@@ -528,10 +569,6 @@ The device has been running for:
 
 - **Llama 3.3 70B** — High quality, good balance
 - **Llama 3.1 8B** — Fast & economical for simple queries
-
-### Python Version
-
-- Python 3.12+ (uses modern type hints, TypedDict, and async/await patterns)
 
 ## 🔒 Security Features
 
