@@ -170,33 +170,129 @@ network-agent/
 
 The application includes comprehensive monitoring capabilities with both health checks and detailed metrics tracking:
 
+### Configuration Management
+
+The application uses a unified configuration system through the `Config` class in `src/config.py`. This system combines:
+
+1. **YAML Configuration**: Load defaults from `config.yaml`
+2. **Environment Variables**: Override settings via environment variables
+3. **Runtime Updates**: Dynamically update configuration during execution
+
+The new unified configuration replaces the old split configuration system that used separate `AppConfigManager` and `EnvConfigManager` classes, which are now deprecated.
+
 ### Configuration File Support (`config.yaml`)
 
 The application supports configuration through a YAML file with the following sections:
 
 ```yaml
+# Network Agent Configuration
+#
+# Security settings:
 security:
-  max_query_length: 500
-  max_queries_per_session: 100
-  allowed_commands:
+  max_query_length: 500  # Maximum query length in characters
+  max_queries_per_session: 100  # Maximum queries per session
+  allowed_commands:  # Whitelisted command prefixes
     - show
     - display
     - get
-  blocked_keywords:
+    - dir
+    - more
+    - verify
+  blocked_keywords:  # Blacklisted command keywords
     - reload
     - write
-    - configure
+    - erase
+    # ... other keywords
 
+# Logging configuration:
 logging:
-  enable_console: false
-  enable_file: true
-  enable_json: true
-  log_level: INFO
+  enable_console: false  # Enable console logging
+  enable_file: true   # Enable file logging
+  enable_json: true   # Enable JSON structured logging
+  log_level: INFO     # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
+# Connection settings:
 connection:
-  max_reconnect_attempts: 3
-  connection_timeout: 30
-  read_timeout: 60
+  max_reconnect_attempts: 3  # Maximum reconnect attempts
+  connection_timeout: 30     # Connection timeout in seconds
+  read_timeout: 60          # Read timeout in seconds
+  command_timeout: 60       # Command timeout in seconds
+
+# Agent settings:
+agent:
+  default_model: "llama-3.3-70b-versatile"  # Default LLM model
+  temperature: 0.1                          # Model temperature (0.0-1.0)
+  platform_type: "Cisco IOS"               # Network platform type
+  verbose_mode: false                      # Enable verbose logging
+  api_timeout: 60                          # API timeout in seconds
+
+# Limits configuration:
+limits:
+  max_commands_per_minute: 30       # Command rate limiting
+  max_session_duration_minutes: 120 # Session duration limit
+```
+
+### Environment Variable Overrides
+
+Configuration can be overridden by environment variables with the following mapping:
+
+| YAML Path | Environment Variable | Type |
+|-----------|---------------------|------|
+| `security.max_query_length` | `MAX_QUERY_LENGTH` | Integer |
+| `security.max_queries_per_session` | `MAX_QUERIES_PER_SESSION` | Integer |
+| `logging.log_level` | `LOG_LEVEL` | String |
+| `logging.enable_console` | `ENABLE_CONSOLE` | Boolean |
+| `logging.enable_file` | `ENABLE_FILE` | Boolean |
+| `logging.enable_json` | `ENABLE_JSON` | Boolean |
+| `connection.max_reconnect_attempts` | `MAX_RECONNECT_ATTEMPTS` | Integer |
+| `connection.connection_timeout` | `CONNECTION_TIMEOUT` | Integer |
+| `connection.read_timeout` | `READ_TIMEOUT` | Integer |
+| `connection.command_timeout` | `COMMAND_TIMEOUT` | Integer |
+| `agent.default_model` | `DEFAULT_MODEL` | String |
+| `agent.temperature` | `TEMPERATURE` | Float |
+| `agent.platform_type` | `PLATFORM_TYPE` | String |
+| `agent.verbose_mode` | `VERBOSE_MODE` | Boolean |
+| `agent.api_timeout` | `API_TIMEOUT` | Integer |
+| `limits.max_commands_per_minute` | `MAX_COMMANDS_PER_MINUTE` | Integer |
+| `limits.max_session_duration_minutes` | `MAX_SESSION_DURATION_MINUTES` | Integer |
+
+### Using Configuration in Code
+
+```python
+# New unified configuration (recommended)
+from src.config import Config
+
+config = Config()
+max_query_length = config.app.security.max_query_length
+api_key = config.groq_api_key
+
+# Validate configuration
+errors = config.validate()
+if errors:
+    print("Configuration errors:", errors)
+
+# Update configuration at runtime
+config.update("security", "max_query_length", 1000)
+```
+
+### Migration from Old Configuration System
+
+The old split configuration system (AppConfigManager and EnvConfigManager) is now deprecated. Here's how to migrate:
+
+```python
+# Old way (deprecated)
+from src.app_config import AppConfigManager
+from src.env_config import EnvConfigManager
+
+app_config = AppConfigManager()
+env_config = EnvConfigManager()
+
+# New way (recommended)
+from src.config import Config
+
+config = Config()
+max_query_length = config.app.security.max_query_length
+api_key = config.groq_api_key
 ```
 
 ### Health Check Module (`src/health.py`)
@@ -310,8 +406,9 @@ For production deployments, these endpoints can be integrated with monitoring sy
 
 | Module | Class | Responsibility |
 |--------|-------|-----------------|
-| `config.py` | `ConfigManager` | Load environment variables and credentials |
-| `config_file.py` | `ConfigManager` | Load configuration from YAML files |
+| `config.py` | `Config` | Unified configuration management (environment variables + YAML) |
+| `app_config.py` | `AppConfigManager` | Legacy application configuration (deprecated) |
+| `env_config.py` | `EnvConfigManager` | Legacy environment configuration (deprecated) |
 | `network_device.py` | `DeviceConnection` | SSH connection and command execution |
 | `agent.py` | `Agent` | LLM setup and AI reasoning |
 | `interface.py` | `UserInterface` | Interactive CLI interface |
