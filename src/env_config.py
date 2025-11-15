@@ -1,13 +1,12 @@
-"""Configuration management for network automation."""
+"""Environment configuration management."""
 
 import getpass
 import os
-
 from dotenv import load_dotenv
 
 
-class ConfigManager:
-    """Manage configuration and environment variables."""
+class EnvConfigManager:
+    """Manage environment variables and secrets."""
 
     def __init__(self):
         """Initialize configuration by loading environment variables."""

@@ -1,5 +1,5 @@
 """
-Configuration management module for the network agent.
+Application configuration management module for the network agent.
 
 Handles loading and managing configuration from YAML files.
 """
@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 
-class ConfigManager:
+class AppConfigManager:
     """Manages application configuration from YAML files."""
 
     def __init__(self, config_path: str = "config.yaml"):
@@ -56,9 +56,9 @@ class ConfigManager:
                 "max_queries_per_session": 100,
                 "allowed_commands": ["show", "display", "get", "dir", "more", "verify"],
                 "blocked_keywords": [
-                    "reload", "write", "erase", "delete", "no", "clear", 
-                    "configure", "conf", "enable", "copy", "format", 
-                    "shutdown", "boot", "username", "password", 
+                    "reload", "write", "erase", "delete", "no", "clear",
+                    "configure", "conf", "enable", "copy", "format",
+                    "shutdown", "boot", "username", "password",
                     "crypto", "key", "certificate"
                 ]
             },
@@ -90,7 +90,7 @@ class ConfigManager:
     def _validate_config(self):
         """Validate the configuration structure and values."""
         required_sections = ["security", "logging", "connection", "agent", "limits"]
-        
+
         for section in required_sections:
             if section not in self._config:
                 print(f"Warning: Missing configuration section '{section}', using defaults")
@@ -106,7 +106,7 @@ class ConfigManager:
     def _validate_security_config(self):
         """Validate security configuration."""
         security = self._config.get("security", {})
-        
+
         # Validate max_query_length
         max_length = security.get("max_query_length", 500)
         if not isinstance(max_length, int) or max_length <= 0:
@@ -130,16 +130,16 @@ class ConfigManager:
         if not isinstance(blocked, list):
             print("Warning: blocked_keywords must be a list, using default")
             security["blocked_keywords"] = [
-                "reload", "write", "erase", "delete", "no", "clear", 
-                "configure", "conf", "enable", "copy", "format", 
-                "shutdown", "boot", "username", "password", 
+                "reload", "write", "erase", "delete", "no", "clear",
+                "configure", "conf", "enable", "copy", "format",
+                "shutdown", "boot", "username", "password",
                 "crypto", "key", "certificate"
             ]
 
     def _validate_logging_config(self):
         """Validate logging configuration."""
         logging = self._config.get("logging", {})
-        
+
         # Validate boolean flags
         for flag in ["enable_console", "enable_file", "enable_json"]:
             value = logging.get(flag)
@@ -157,7 +157,7 @@ class ConfigManager:
     def _validate_connection_config(self):
         """Validate connection configuration."""
         connection = self._config.get("connection", {})
-        
+
         # Validate numeric timeouts
         for timeout_name in ["connection_timeout", "read_timeout", "command_timeout"]:
             timeout = connection.get(timeout_name)
@@ -174,7 +174,7 @@ class ConfigManager:
     def _validate_agent_config(self):
         """Validate agent configuration."""
         agent = self._config.get("agent", {})
-        
+
         # Validate temperature
         temp = agent.get("temperature", 0.1)
         if not isinstance(temp, (int, float)) or temp < 0 or temp > 1:
@@ -196,7 +196,7 @@ class ConfigManager:
     def _validate_limits_config(self):
         """Validate limits configuration."""
         limits = self._config.get("limits", {})
-        
+
         # Validate max_commands_per_minute
         max_cmd = limits.get("max_commands_per_minute", 30)
         if not isinstance(max_cmd, int) or max_cmd <= 0:

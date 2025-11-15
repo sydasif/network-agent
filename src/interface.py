@@ -4,7 +4,8 @@ import re
 from .agent import Agent
 from .audit import AuditLogger, SecurityEventType
 from .commands import Commands
-from .config import ConfigManager
+from .env_config import EnvConfigManager  # Changed from ConfigManager
+from .app_config import AppConfigManager   # Changed from ConfigManager
 from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
 from .settings import Settings
@@ -47,13 +48,15 @@ class InputValidator:
         r"eval\(",      # Code execution
     ]
 
-    def __init__(self, audit_logger=None):
+    def __init__(self, audit_logger=None, max_query_length: int = 500):
         """Initialize the validator.
 
         Args:
             audit_logger: Optional audit logger for logging validation events
+            max_query_length: Maximum allowed query length
         """
         self.audit_logger = audit_logger
+        self.max_query_length = max_query_length
 
     def validate_query(self, query: str) -> tuple[bool, str]:
         """Validate user query for security concerns.
@@ -70,11 +73,11 @@ class InputValidator:
         if not query or not query.strip():
             return False, "Empty query"
 
-        # Check length limits
-        if len(query) > InputValidator.MAX_QUERY_LENGTH:
+        # Check length limits (now configurable)
+        if len(query) > self.max_query_length:
             error_message = (
                 f"❌ Query too long ({len(query)} characters)\n"
-                f"   Maximum allowed: {InputValidator.MAX_QUERY_LENGTH} characters\n"
+                f"   Maximum allowed: {self.max_query_length} characters\n"
                 f"   Please shorten your question."
             )
 
@@ -171,32 +174,43 @@ class UserInterface:
 
     def __init__(self):
         """Initialize the user interface."""
-        self.config_manager = ConfigManager()
+        # Environment config (API keys, passwords)
+        self.env_config = EnvConfigManager()
+
+        # Application config (security, logging, limits)
+        self.app_config = AppConfigManager("config.yaml")
+
         self.device = None
         self.assistant = None
         self.query_count = 0
-        self.max_queries_per_session = 100  # Prevent infinite loops
 
-        # CRITICAL: Initialize audit logger
+        # Get max queries from app config
+        self.max_queries_per_session = self.app_config.get_max_queries_per_session()
+
+        # Initialize audit logger with app config settings
+        log_config = self.app_config.get_logging_config()
         self.audit_logger = AuditLogger(
             log_dir="logs",
-            enable_console=False,  # Don't clutter console
-            enable_file=True,      # Write to file
-            enable_json=True,      # Structured logs for SIEM
-            log_level="INFO",
+            enable_console=log_config.get("enable_console", False),
+            enable_file=log_config.get("enable_file", True),
+            enable_json=log_config.get("enable_json", True),
+            log_level=log_config.get("log_level", "INFO"),
         )
 
-        # Initialize validator with audit logger
-        self.validator = InputValidator(audit_logger=self.audit_logger)
+        # Initialize validator with app config settings
+        self.validator = InputValidator(
+            audit_logger=self.audit_logger,
+            max_query_length=self.app_config.get_max_query_length()
+        )
 
-        # Initialize data protector for sanitizing logs and output
+        # Initialize data protector
         self.data_protector = SensitiveDataProtector()
 
     def _prompt_for_device_credentials(self):
         """Prompt user for device connection details."""
         hostname = input("\nDevice IP: ").strip()
         username = input("Username: ").strip()
-        password = self.config_manager.get_device_password()
+        password = self.env_config.get_device_password()  # Changed
         return hostname, username, password
 
     def _setup_network_assistant(self, api_key: str, settings: dict):
@@ -311,8 +325,8 @@ class UserInterface:
             # Get connection details
             hostname, username, password = self._prompt_for_device_credentials()
 
-            # Get API key
-            api_key = self.config_manager.get_groq_api_key()
+            # Get API key from environment
+            api_key = self.env_config.get_groq_api_key()  # Changed
 
             # Initialize assistant with settings
             self._setup_network_assistant(api_key, settings)
