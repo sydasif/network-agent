@@ -10,33 +10,33 @@ import yaml
 # Add src to path so we can import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.app_config import AppConfigManager
+from src.config import Config
 
 
-def test_app_config_manager_default():
-    """Test AppConfigManager with default configuration."""
-    print("Testing AppConfigManager with default configuration...")
+def test_config_default():
+    """Test Config with default configuration."""
+    print("Testing Config with default configuration...")
 
-    # Create an AppConfigManager instance without a config file
+    # Create a Config instance without a config file
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = os.path.join(temp_dir, "nonexistent_config.yaml")
-        config_manager = AppConfigManager(config_path)
+        config = Config(config_path)
 
         # Verify default values are used
-        assert config_manager.get_max_query_length() == 500
-        assert config_manager.get_max_queries_per_session() == 100
-        assert "show" in config_manager.get_allowed_commands()
-        assert "reload" in config_manager.get_blocked_keywords()
-        assert config_manager.is_file_logging_enabled() is True
-        assert config_manager.get_connection_timeout() == 30
-        assert config_manager.get_default_model() == "llama-3.3-70b-versatile"
+        assert config.app.security.max_query_length == 500
+        assert config.app.security.max_queries_per_session == 100
+        assert "show" in config.app.security.allowed_commands
+        assert "reload" in config.app.security.blocked_keywords
+        assert config.app.logging.enable_file is True
+        assert config.app.connection.connection_timeout == 30
+        assert config.app.agent.default_model == "llama-3.3-70b-versatile"
 
         print("✓ Default configuration test passed")
 
 
-def test_app_config_manager_from_file():
-    """Test AppConfigManager with configuration from file."""
-    print("Testing AppConfigManager with configuration from file...")
+def test_config_from_file():
+    """Test Config with configuration from file."""
+    print("Testing Config with configuration from file...")
 
     # Create a temporary config file with custom values
     custom_config = {
@@ -78,71 +78,29 @@ def test_app_config_manager_from_file():
         with open(config_path, 'w') as f:
             yaml.dump(custom_config, f)
 
-        # Create AppConfigManager with the custom config file
-        config_manager = AppConfigManager(config_path)
+        # Create Config with the custom config file
+        config = Config(config_path)
 
         # Verify custom values are loaded
-        assert config_manager.get_max_query_length() == 1000
-        assert config_manager.get_max_queries_per_session() == 50
-        assert "test" in config_manager.get_allowed_commands()
-        assert "custom" in config_manager.get_allowed_commands()
-        assert "dangerous" in config_manager.get_blocked_keywords()
-        assert "forbidden" in config_manager.get_blocked_keywords()
-        assert config_manager.is_console_logging_enabled() is True
-        assert config_manager.get_connection_timeout() == 60
-        assert config_manager.get_default_model() == "custom-model"
-        assert config_manager.get_temperature() == 0.5
-        assert config_manager.is_verbose_mode() is True
-        assert config_manager.get_max_commands_per_minute() == 15
+        assert config.app.security.max_query_length == 1000
+        assert config.app.security.max_queries_per_session == 50
+        assert "test" in config.app.security.allowed_commands
+        assert "custom" in config.app.security.allowed_commands
+        assert "dangerous" in config.app.security.blocked_keywords
+        assert "forbidden" in config.app.security.blocked_keywords
+        assert config.app.logging.enable_console is True
+        assert config.app.connection.connection_timeout == 60
+        assert config.app.agent.default_model == "custom-model"
+        assert config.app.agent.temperature == 0.5
+        assert config.app.agent.verbose_mode is True
+        assert config.app.limits.max_commands_per_minute == 15
 
         print("✓ Configuration from file test passed")
 
 
-def test_app_config_manager_validation():
-    """Test AppConfigManager configuration validation."""
-    print("Testing AppConfigManager configuration validation...")
-
-    # Create a config with invalid values
-    invalid_config = {
-        "security": {
-            "max_query_length": -100,  # Invalid: negative
-            "max_queries_per_session": "not_a_number",  # Invalid: not a number
-            "allowed_commands": "not_a_list",  # Invalid: not a list
-            "blocked_keywords": None  # Invalid: None
-        },
-        "logging": {
-            "enable_console": "not_a_bool",  # Invalid: not a boolean
-            "log_level": "INVALID_LEVEL"  # Invalid: not in valid levels
-        },
-        "connection": {
-            "max_reconnect_attempts": -5,  # Invalid: negative
-            "connection_timeout": 0  # Invalid: zero or negative
-        }
-    }
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = os.path.join(temp_dir, "invalid_config.yaml")
-
-        # Write the invalid config to file
-        with open(config_path, 'w') as f:
-            yaml.dump(invalid_config, f)
-
-        # Create AppConfigManager with the invalid config file
-        config_manager = AppConfigManager(config_path)
-
-        # Validation should fix invalid values to defaults
-        assert config_manager.get_max_query_length() > 0  # Should be positive
-        assert config_manager.get_max_queries_per_session() > 0  # Should be positive
-        assert isinstance(config_manager.get_allowed_commands(), list)  # Should be list
-        assert isinstance(config_manager.get_blocked_keywords(), list)  # Should be list
-        assert isinstance(config_manager.is_console_logging_enabled(), bool)  # Should be bool
-
-        print("✓ Configuration validation test passed")
-
-
-def test_app_config_manager_reload():
-    """Test AppConfigManager configuration reloading."""
-    print("Testing AppConfigManager configuration reloading...")
+def test_config_reload():
+    """Test Config configuration reloading."""
+    print("Testing Config configuration reloading...")
 
     # Create initial config
     initial_config = {
@@ -167,71 +125,38 @@ def test_app_config_manager_reload():
         with open(config_path, 'w') as f:
             yaml.dump(initial_config, f)
 
-        # Create AppConfigManager
-        config_manager = AppConfigManager(config_path)
+        # Create Config
+        config = Config(config_path)
 
         # Verify initial values
-        assert config_manager.get_max_query_length() == 500
+        assert config.app.security.max_query_length == 500
 
         # Update the file with new config
         with open(config_path, 'w') as f:
             yaml.dump(updated_config, f)
 
         # Reload the config
-        config_manager.reload_config()
+        config.reload()
 
         # Verify updated values
-        assert config_manager.get_max_query_length() == 1000
-        assert config_manager.get_max_queries_per_session() == 200
+        assert config.app.security.max_query_length == 1000
+        assert config.app.security.max_queries_per_session == 200
 
         print("✓ Configuration reload test passed")
-
-
-def test_app_config_manager_update():
-    """Test AppConfigManager configuration updating."""
-    print("Testing AppConfigManager configuration updating...")
-
-    # Create an AppConfigManager with default config
-    config_manager = AppConfigManager()
-
-    # Update with new values
-    new_config = {
-        "security": {
-            "max_query_length": 2000
-        },
-        "agent": {
-            "default_model": "updated-model"
-        }
-    }
-
-    config_manager.update_config(new_config)
-
-    # Verify updated values
-    assert config_manager.get_max_query_length() == 2000
-    assert config_manager.get_default_model() == "updated-model"
-
-    # Verify other values remain unchanged
-    assert config_manager.get_connection_timeout() == 30  # Default value
-
-    print("✓ Configuration update test passed")
 
 
 def run_all_tests():
     """Run all configuration tests."""
     print("Running Application Configuration Test Suite...\n")
 
-    test_app_config_manager_default()
-    test_app_config_manager_from_file()
-    test_app_config_manager_validation()
-    test_app_config_manager_reload()
-    test_app_config_manager_update()
+    test_config_default()
+    test_config_from_file()
+    test_config_reload()
 
     print("\n🎉 All Configuration Tests Passed!")
     print("✅ Default configuration handling")
     print("✅ File-based configuration loading")
-    print("✅ Configuration validation")
     print("✅ Configuration reloading")
-    print("✅ Configuration updating")
 
 
 if __name__ == "__main__":

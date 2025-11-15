@@ -1,15 +1,27 @@
-"""Environment configuration management."""
+"""Environment configuration management.
+
+WARNING: This class is DEPRECATED. Use Config from src.config instead.
+"""
 
 import getpass
 import os
 from dotenv import load_dotenv
+import warnings
 
 
 class EnvConfigManager:
-    """Manage environment variables and secrets."""
+    """Manage environment variables and secrets.
+
+    WARNING: This class is DEPRECATED. Use Config from src.config instead.
+    """
 
     def __init__(self):
         """Initialize configuration by loading environment variables."""
+        warnings.warn(
+            "EnvConfigManager is deprecated. Use Config from src.config instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         load_dotenv()
 
     @staticmethod

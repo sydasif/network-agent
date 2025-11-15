@@ -16,7 +16,7 @@ security:
     - write
     - erase
     - delete
-    - no 
+    - 'no'
     - clear
     - configure
     - conf

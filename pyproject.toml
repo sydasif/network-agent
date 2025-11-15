@@ -10,6 +10,7 @@ dependencies = [
     "netmiko>=4.6.0",
     "pytest>=9.0.1",
     "python-dotenv>=1.2.1",
+    "pydantic>=2.0.0",
 ]
 
 [dependency-groups]

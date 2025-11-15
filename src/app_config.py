@@ -2,16 +2,22 @@
 Application configuration management module for the network agent.
 
 Handles loading and managing configuration from YAML files.
+
+WARNING: This class is DEPRECATED. Use Config from src.config instead.
 """
 
 import yaml
 import os
 from typing import Dict, Any, Optional, List
 from pathlib import Path
+import warnings
 
 
 class AppConfigManager:
-    """Manages application configuration from YAML files."""
+    """Manages application configuration from YAML files.
+
+    WARNING: This class is DEPRECATED. Use Config from src.config instead.
+    """
 
     def __init__(self, config_path: str = "config.yaml"):
         """Initialize the configuration manager.
@@ -19,6 +25,11 @@ class AppConfigManager:
         Args:
             config_path: Path to the configuration file
         """
+        warnings.warn(
+            "AppConfigManager is deprecated. Use Config from src.config instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.config_path = Path(config_path)
         self._config = self._load_config()
         self._validate_config()
