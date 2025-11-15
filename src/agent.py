@@ -47,6 +47,7 @@ class Agent:
         verbose: bool = False,
         timeout: int = 60,
         audit_logger: AuditLogger = None,
+        config=None,
     ) -> None:
         """Initialize the agent."""
         self.device = device
@@ -55,8 +56,17 @@ class Agent:
         self.command_history = []
         self.groq_api_key = groq_api_key
         self.data_protector = SensitiveDataProtector()
-        self.rate_limit_requests = 30
-        self.rate_limit_window = 60
+
+        # Use configuration for rate limiting if provided, otherwise use defaults
+        if config is not None:
+            self.config = config
+            self.rate_limit_requests = self.config.limits.max_commands_per_minute
+            self.rate_limit_window = self.config.limits.rate_limit_window_seconds
+        else:
+            # Defaults for backward compatibility
+            self.rate_limit_requests = 30
+            self.rate_limit_window = 60
+
         self.request_times = deque()
         self.primary_model = model_name
         self.current_model = model_name
@@ -325,22 +335,15 @@ Thought:{agent_scratchpad}"""
         self, command_stripped: str, command_lower: str
     ) -> str | None:
         """Check if command starts with allowed prefix."""
-        # CRITICAL SECURITY: Whitelist only safe read-only commands
-        ALLOWED_PREFIXES = [
-            "show",  # Cisco IOS show commands
-            "display",  # Some vendor alternatives
-            "get",  # Get information commands
-            "dir",  # Directory listing
-            "more",  # View file contents
-            "verify",  # Verify operations (read-only)
-        ]
+        # CRITICAL SECURITY: Use configured allowed prefixes
+        allowed_prefixes = self.config.security.allowed_commands
 
         is_allowed = any(
-            command_lower.startswith(prefix) for prefix in ALLOWED_PREFIXES
+            command_lower.startswith(prefix) for prefix in allowed_prefixes
         )
 
         if not is_allowed:
-            allowed_str = ", ".join(ALLOWED_PREFIXES)
+            allowed_str = ", ".join(allowed_prefixes)
             msg = (
                 f"⚠ BLOCKED: '{command_stripped}'\n"
                 f"   Reason: Does not start with allowed prefix\n"
@@ -369,13 +372,12 @@ Thought:{agent_scratchpad}"""
 
         # Check for pipe command chaining
         if "|" in command_stripped:
-            # Allow ONLY 'include', 'begin', 'section', and 'exclude' (common Cisco filters)
-            allowed_pipe_commands = ["| include", "| begin", "| section", "| exclude"]
+            # Tests require uppercase | INCLUDE, so convert to lowercase before checks
+            lowered = command_lower
 
-            # Check if pipe is followed by allowed command
-            has_allowed_pipe = any(
-                allowed in command_lower for allowed in allowed_pipe_commands
-            )
+            # Allow ONLY 'include', 'begin', 'section', and 'exclude' (common Cisco filters)
+            allowed_ops = ["| include", "| begin", "| section", "| exclude"]
+            has_allowed_pipe = any(op in lowered for op in allowed_ops)
 
             if not has_allowed_pipe:
                 msg = (

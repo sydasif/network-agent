@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.agent import Agent
 from src.network_device import DeviceConnection
 from src.audit import AuditLogger
+from src.config import Config
 
 
 def test_allowed_prefixes():
@@ -19,12 +20,16 @@ def test_allowed_prefixes():
     mock_device = Mock(spec=DeviceConnection)
     mock_device.execute_command.return_value = "Command executed successfully"
 
+    # Create a config instance
+    config = Config("config.yaml")
+
     audit_logger = Mock(spec=AuditLogger)
     agent = Agent(
         groq_api_key="fake_key",
         device=mock_device,
         verbose=False,
-        audit_logger=audit_logger
+        audit_logger=audit_logger,
+        config=config.app
     )
 
     # List of allowed prefixes from the agent code
@@ -63,12 +68,16 @@ def test_case_insensitive_prefix_matching():
     mock_device = Mock(spec=DeviceConnection)
     mock_device.execute_command.return_value = "Command executed successfully"
 
+    # Create a config instance
+    config = Config("config.yaml")
+
     audit_logger = Mock(spec=AuditLogger)
     agent = Agent(
         groq_api_key="fake_key",
         device=mock_device,
         verbose=False,
-        audit_logger=audit_logger
+        audit_logger=audit_logger,
+        config=config.app
     )
 
     # Test various case combinations for allowed prefixes
@@ -96,12 +105,16 @@ def test_allowed_pipe_commands():
     mock_device = Mock(spec=DeviceConnection)
     mock_device.execute_command.return_value = "Piped command executed successfully"
 
+    # Create a config instance
+    config = Config("config.yaml")
+
     audit_logger = Mock(spec=AuditLogger)
     agent = Agent(
         groq_api_key="fake_key",
         device=mock_device,
         verbose=False,
-        audit_logger=audit_logger
+        audit_logger=audit_logger,
+        config=config.app
     )
 
     # Test allowed pipe commands (excluding those with blocked keywords)
@@ -127,12 +140,16 @@ def test_prefix_with_various_formats():
     mock_device = Mock(spec=DeviceConnection)
     mock_device.execute_command.return_value = "Command executed successfully"
 
+    # Create a config instance
+    config = Config("config.yaml")
+
     audit_logger = Mock(spec=AuditLogger)
     agent = Agent(
         groq_api_key="fake_key",
         device=mock_device,
         verbose=False,
-        audit_logger=audit_logger
+        audit_logger=audit_logger,
+        config=config.app
     )
 
     # Test variations of allowed commands
@@ -183,12 +200,16 @@ def test_prefix_not_at_start():
     mock_device = Mock(spec=DeviceConnection)
     mock_device.execute_command.return_value = "This should not be reached for blocked commands"
 
+    # Create a config instance
+    config = Config("config.yaml")
+
     audit_logger = Mock(spec=AuditLogger)
     agent = Agent(
         groq_api_key="fake_key",
         device=mock_device,
         verbose=False,
-        audit_logger=audit_logger
+        audit_logger=audit_logger,
+        config=config.app
     )
 
     # These commands contain allowed prefixes but don't start with them

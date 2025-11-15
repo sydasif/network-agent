@@ -30,6 +30,7 @@ class LoggingConfig(BaseModel):
     enable_file: bool = True
     enable_json: bool = True
     log_level: str = "INFO"
+    log_directory: str = "logs"
 
 
 class ConnectionConfig(BaseModel):
@@ -37,6 +38,8 @@ class ConnectionConfig(BaseModel):
     connection_timeout: int = 30
     read_timeout: int = 60
     command_timeout: int = 60
+    banner_timeout: int = 15
+    global_delay_factor: int = 2
 
 
 class AgentConfig(BaseModel):
@@ -50,6 +53,7 @@ class AgentConfig(BaseModel):
 class LimitsConfig(BaseModel):
     max_commands_per_minute: int = 30
     max_session_duration_minutes: int = 120
+    rate_limit_window_seconds: int = 60
 
 
 class AppConfig(BaseModel):
@@ -92,12 +96,15 @@ class Config:
                 "enable_console": self._get_env_bool("ENABLE_CONSOLE"),
                 "enable_file": self._get_env_bool("ENABLE_FILE"),
                 "enable_json": self._get_env_bool("ENABLE_JSON"),
+                "log_directory": os.getenv("LOG_DIRECTORY"),
             },
             "connection": {
                 "max_reconnect_attempts": self._get_env_int("MAX_RECONNECT_ATTEMPTS"),
                 "connection_timeout": self._get_env_int("CONNECTION_TIMEOUT"),
                 "read_timeout": self._get_env_int("READ_TIMEOUT"),
                 "command_timeout": self._get_env_int("COMMAND_TIMEOUT"),
+                "banner_timeout": self._get_env_int("BANNER_TIMEOUT"),
+                "global_delay_factor": self._get_env_int("GLOBAL_DELAY_FACTOR"),
             },
             "agent": {
                 "default_model": os.getenv("DEFAULT_MODEL"),
@@ -109,6 +116,7 @@ class Config:
             "limits": {
                 "max_commands_per_minute": self._get_env_int("MAX_COMMANDS_PER_MINUTE"),
                 "max_session_duration_minutes": self._get_env_int("MAX_SESSION_DURATION_MINUTES"),
+                "rate_limit_window_seconds": self._get_env_int("RATE_LIMIT_WINDOW_SECONDS"),
             }
         }
 

@@ -38,6 +38,7 @@ logging:
   enable_file: true   # Enable file logging
   enable_json: true   # Enable JSON structured logging
   log_level: INFO     # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  log_directory: "logs" # Directory for log files
 
 # Connection settings:
 connection:
@@ -45,6 +46,8 @@ connection:
   connection_timeout: 30     # Connection timeout in seconds
   read_timeout: 60          # Read timeout in seconds
   command_timeout: 60       # Command timeout in seconds
+  banner_timeout: 15        # Banner timeout in seconds
+  global_delay_factor: 2    # Global delay factor for slow devices
 
 # Agent settings:
 agent:
@@ -58,3 +61,4 @@ agent:
 limits:
   max_commands_per_minute: 30       # Command rate limiting
   max_session_duration_minutes: 120 # Session duration limit
+  rate_limit_window_seconds: 60     # Time window for rate limiting

@@ -186,7 +186,7 @@ class UserInterface:
         # Initialize audit logger with app config settings
         log_config = self.config.app.logging
         self.audit_logger = AuditLogger(
-            log_dir="logs",
+            log_dir=log_config.log_directory,
             enable_console=log_config.enable_console,
             enable_file=log_config.enable_file,
             enable_json=log_config.enable_json,
@@ -211,7 +211,7 @@ class UserInterface:
 
     def _setup_network_assistant(self, api_key: str, settings: dict):
         """Initialize the device connection and agent with settings."""
-        self.device = DeviceConnection()
+        self.device = DeviceConnection(conn_config=self.config.app.connection)
         self.assistant = Agent(
             api_key,
             self.device,
@@ -220,6 +220,7 @@ class UserInterface:
             verbose=settings["verbose"],
             timeout=settings["timeout"],
             audit_logger=self.audit_logger,
+            config=self.config.app,
         )
 
     def _run_interactive_session(self):

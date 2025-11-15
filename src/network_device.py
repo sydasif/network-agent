@@ -15,14 +15,22 @@ class ConnectionState:
 class DeviceConnection:
     """Manage network device connection and commands with state tracking."""
 
-    def __init__(self):
+    def __init__(self, conn_config=None):
         """Initialize device connection handler."""
         self.connection = None
         self.state = ConnectionState.DISCONNECTED
         self.device_config = None
         self.last_error = None
         self.connection_attempts = 0
-        self.max_reconnect_attempts = 3
+
+        if conn_config is not None:
+            self.conn_config = conn_config
+            self.max_reconnect_attempts = conn_config.max_reconnect_attempts
+        else:
+            # Default values for backward compatibility
+            from .config import ConnectionConfig
+            self.conn_config = ConnectionConfig()
+            self.max_reconnect_attempts = self.conn_config.max_reconnect_attempts
 
         # CRITICAL: Add thread lock to prevent concurrent reconnection attempts
         self._connection_lock = threading.Lock()
@@ -43,13 +51,13 @@ class DeviceConnection:
             "host": hostname,
             "username": username,
             "password": password,
-            "timeout": 30,
-            "session_timeout": 60,
-            "auth_timeout": 30,
-            "banner_timeout": 15,
+            "timeout": self.conn_config.connection_timeout,
+            "session_timeout": self.conn_config.read_timeout,
+            "auth_timeout": self.conn_config.connection_timeout,
+            "banner_timeout": self.conn_config.banner_timeout,
             # CRITICAL: Add fast_cli to prevent pattern matching issues with piped commands
             "fast_cli": False,  # Disable fast mode for better reliability
-            "global_delay_factor": 2,  # Increase delay for slow devices
+            "global_delay_factor": self.conn_config.global_delay_factor,  # Increase delay for slow devices
         }
 
         try:
@@ -205,7 +213,7 @@ class DeviceConnection:
             # Increase read_timeout for piped commands (they can be slow)
             output = self.connection.send_command(
                 command,
-                read_timeout=60,  # Increase from 30 to 60 for complex commands
+                read_timeout=self.conn_config.command_timeout,  # Use config value
                 expect_string=r"#",  # Explicitly tell Netmiko to look for #
             )
             self.connection_attempts = 0  # Reset counter on success
