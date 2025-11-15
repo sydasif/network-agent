@@ -42,7 +42,7 @@ class Agent:
         self,
         groq_api_key: str,
         device: DeviceConnection,
-        model_name: str = "openai/gpt-oss-120b",
+        model_name: str,
         temperature: float = 0.1,
         verbose: bool = False,
         timeout: int = 60,
