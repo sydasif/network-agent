@@ -1,0 +1,55 @@
+# Network Agent Configuration
+# For production use, create this file in the root directory of the project
+
+security:
+  max_query_length: 500
+  max_queries_per_session: 100
+  allowed_commands:
+    - show
+    - display
+    - get
+    - dir
+    - more
+    - verify
+  blocked_keywords:
+    - reload
+    - write
+    - erase
+    - delete
+    - no 
+    - clear
+    - configure
+    - conf
+    - enable
+    - copy
+    - format
+    - shutdown
+    - boot
+    - username
+    - password
+    - crypto
+    - key
+    - certificate
+
+logging:
+  enable_console: false
+  enable_file: true
+  enable_json: true
+  log_level: INFO
+
+connection:
+  max_reconnect_attempts: 3
+  connection_timeout: 30
+  read_timeout: 60
+  command_timeout: 60
+
+agent:
+  default_model: "llama-3.3-70b-versatile"
+  temperature: 0.1
+  platform_type: "Cisco IOS"
+  verbose_mode: false
+  api_timeout: 60
+
+limits:
+  max_commands_per_minute: 30
+  max_session_duration_minutes: 120

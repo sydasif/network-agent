@@ -152,14 +152,157 @@ network-agent/
 ├── src/                    # Application modules
 │   ├── __init__.py
 │   ├── config.py          # Configuration management
+│   ├── config_file.py     # Configuration file support
 │   ├── network_device.py  # Device connection
 │   ├── agent.py           # AI agent setup
 │   ├── interface.py       # User interface
+│   ├── health.py          # Health check functionality
+│   ├── metrics.py         # Metrics dashboard
 │   └── utils.py           # Utilities
+├── config.yaml             # Configuration file example
 ├── pyproject.toml         # Project dependencies
 ├── .env                   # Environment secrets
+├── tests/                 # Test files
 └── README.md              # This file
 ```
+
+## 🏥 Health Monitoring & Configuration
+
+The application includes comprehensive monitoring capabilities with both health checks and detailed metrics tracking:
+
+### Configuration File Support (`config.yaml`)
+
+The application supports configuration through a YAML file with the following sections:
+
+```yaml
+security:
+  max_query_length: 500
+  max_queries_per_session: 100
+  allowed_commands:
+    - show
+    - display
+    - get
+  blocked_keywords:
+    - reload
+    - write
+    - configure
+
+logging:
+  enable_console: false
+  enable_file: true
+  enable_json: true
+  log_level: INFO
+
+connection:
+  max_reconnect_attempts: 3
+  connection_timeout: 30
+  read_timeout: 60
+```
+
+### Health Check Module (`src/health.py`)
+
+- **Health Status Class** — Provides detailed system health information
+- **Connection Monitoring** — Tracks device connection state and uptime
+- **Agent Status** — Monitors AI agent activity and model usage
+- **Command Statistics** — Tracks successful/failed command execution rates
+- **System Metrics** — General system information and version
+
+### Health Check Functions
+
+```python
+from src.health import health_check, is_system_healthy
+
+# Get detailed health status
+health_status = health_check(device, agent, audit_logger)
+
+# Check if system is healthy (boolean)
+is_healthy = is_system_healthy(device, agent)
+```
+
+### Example Health Check Output
+
+```json
+{
+  "timestamp": "2025-11-15T13:30:00.123456",
+  "connection": {
+    "state": "connected",
+    "alive": true,
+    "connected": true,
+    "connection_attempts": 1,
+    "uptime_seconds": 3600
+  },
+  "agent": {
+    "model": "llama-3.3-70b-versatile",
+    "active": true,
+    "model_fallback_count": 0,
+    "rate_limit_used": 5,
+    "rate_limit_remaining": 25
+  },
+  "commands": {
+    "total": 15,
+    "successful": 14,
+    "failed": 1,
+    "success_rate": 0.93
+  },
+  "system": {
+    "health_check_time": 1731870600.123,
+    "version": "1.0.0",
+    "status": "healthy"
+  }
+}
+```
+
+### Metrics Dashboard (`src/metrics.py`)
+
+- **Metrics Collection** — Tracks command execution, security events, connections, and model usage
+- **Real-time Metrics** — Monitor commands per minute, success rates, and error counts
+- **Alert System** — Automatic alerts for low success rates, high security events, and other issues
+- **Time-based Analysis** — Historical metrics for trend analysis
+- **API Integration** — Web endpoints for monitoring systems
+
+### Metrics Collection Examples
+
+```python
+from src.metrics import MetricsCollector, MetricType
+
+# Initialize collector
+collector = MetricsCollector(max_events=10000)
+
+# Record different types of events
+collector.record_event(MetricType.COMMAND_EXECUTED, {"command": "show version", "output_length": 150})
+collector.record_event(MetricType.COMMAND_FAILED, {"command": "invalid command", "error": "syntax error"})
+collector.record_event(MetricType.PROMPT_INJECTION_ATTEMPT, {"query": "ignore instructions"})
+```
+
+### Metrics Dashboard Functions
+
+```python
+from src.metrics import MetricsDashboard
+
+# Create dashboard from collector
+dashboard = MetricsDashboard(collector)
+
+# Generate text report
+text_report = dashboard.generate_text_report()
+
+# Generate JSON report for APIs
+json_report = dashboard.generate_json_report()
+
+# Get alerts based on thresholds
+alerts = dashboard.get_alerts()
+```
+
+### Web API Integration
+
+The application includes example Flask endpoints demonstrating how to integrate health checks and metrics into a web API:
+
+- **`/health`** — Returns detailed health status with appropriate HTTP status codes
+- **`/ready`** — Simple readiness check for container orchestration
+- **`/metrics`** — JSON metrics endpoint for monitoring systems
+- **`/metrics/text`** — Human-readable metrics output
+- **`/metrics/health`** — Health-focused metrics with status
+
+For production deployments, these endpoints can be integrated with monitoring systems, load balancers, and orchestration platforms to ensure service availability and automatically handle failures.
 
 ## 🏗️ Architecture
 
@@ -168,9 +311,12 @@ network-agent/
 | Module | Class | Responsibility |
 |--------|-------|-----------------|
 | `config.py` | `ConfigManager` | Load environment variables and credentials |
+| `config_file.py` | `ConfigManager` | Load configuration from YAML files |
 | `network_device.py` | `DeviceConnection` | SSH connection and command execution |
 | `agent.py` | `Agent` | LLM setup and AI reasoning |
 | `interface.py` | `UserInterface` | Interactive CLI interface |
+| `health.py` | `HealthStatus` | System health monitoring |
+| `metrics.py` | `MetricsCollector` | Metrics collection and dashboard |
 | `utils.py` | — | Formatting and utility functions |
 
 ### Data Flow
@@ -299,20 +445,54 @@ The device has been running for:
 
 - Python 3.12+ (uses modern type hints, TypedDict, and async/await patterns)
 
-## 🔒 Security Considerations
+## 🔒 Security Features
 
-⚠️ **Important Security Practices:**
+This application implements **5 layers of security** to ensure safe, production-ready network automation:
 
-1. **Never hardcode credentials** — Always use `.env` file
-2. **Protect `.env` file** — Add to `.gitignore` (never commit)
-3. **Use SSH keys** — When possible, instead of passwords
-4. **Limit API access** — Use Groq API keys with minimal permissions
-5. **Read-only mode** — This setup only runs `show` commands
-6. **Secure network** — Run from a secure management network
-7. **Audit trail** — Consider logging all interactions
-8. **Access control** — Restrict who can run this tool
+### **Read-Only by Design** 🔒
 
-### Example `.gitignore`
+- Only `show`, `display`, and `get` commands are allowed
+- Dangerous commands like `reload`, `write`, `configure` are blocked
+- Command validation with whitelist + blacklist protection
+- Command chaining protection (blocks `;`, allows safe pipes only)
+
+### **Prompt Injection Defense** 🛡️
+
+- Length limits (500 characters maximum)
+- Suspicious pattern detection and blocking
+- Query sanitization for malicious content
+- Special character limits and validation
+
+### **Sensitive Data Protection** 🔐
+
+- Password/API key automatic sanitization
+- SNMP community string redaction
+- TACACS/RADIUS secret masking
+- Error message sanitization to prevent data leaks
+
+### **Comprehensive Audit Logging** 📝
+
+- Persistent log files (text + JSON format)
+- Security event tracking
+- Session summaries for compliance
+- Structured logging for SIEM integration
+
+### **Thread-Safe Connection Management** 🔌
+
+- Auto-reconnect with exponential backoff
+- Connection liveness checking
+- Thread-safe operations (no race conditions)
+- Proper error messages and state tracking
+
+### **Security Implementation Details**:
+
+1. **Command Validation** — All commands pass through a validation layer that verifies they're on the allowed list and don't contain dangerous keywords
+2. **Input Sanitization** — User queries are sanitized before being sent to the LLM to prevent injection attacks
+3. **Sensitive Data Redaction** — All logs and outputs automatically redact sensitive information like passwords, API keys, and secrets
+4. **Connection Security** — SSH connections are managed with proper error handling and reconnection logic
+5. **Rate Limiting Protection** — API usage is monitored and protected against abuse
+
+### **Example `.gitignore`
 
 ```bash
 .env
