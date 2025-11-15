@@ -19,6 +19,13 @@ class ConfigManager:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise ValueError("Error: Set GROQ_API_KEY in .env file")
+
+        # NEVER log or display the actual API key
+        if os.getenv("DEBUG"):
+            from .sensitive_data import SensitiveDataProtector
+            masked_key = SensitiveDataProtector.mask_api_key(api_key)
+            print(f"[DEBUG] Using API key: {masked_key}")
+
         return api_key
 
     @staticmethod

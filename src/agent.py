@@ -16,6 +16,7 @@ from typing_extensions import TypedDict
 
 from .audit import AuditLogger, SecurityEventType
 from .network_device import DeviceConnection
+from .sensitive_data import SensitiveDataProtector
 
 
 # Model fallback chain - order matters (primary to fallback)
@@ -62,6 +63,9 @@ class Agent:
         self.timeout = timeout
         self.command_history = []
         self.groq_api_key = groq_api_key
+
+        # Initialize data protector for sanitizing logs and errors
+        self.data_protector = SensitiveDataProtector()
 
         # Rate limiting
         self.rate_limit_requests = 30
@@ -554,8 +558,9 @@ class Agent:
                 return None  # Indicate retry needed
             return f"{error_msg}. No more fallback models available."
 
-        # Non-rate-limit error
-        return f"❌ Error: {e!s}"
+        # Non-rate-limit error - sanitize before displaying
+        sanitized_error = self.data_protector.sanitize_error(str(e))
+        return f"❌ Error: {sanitized_error}"
 
     def _looks_like_command(self, question: str) -> bool:
         """Check if question looks like a direct command rather than a question."""
@@ -598,7 +603,9 @@ class Agent:
                 }
             )
 
-            return output
+            # Sanitize output before returning
+            sanitized_output = self.data_protector.sanitize_output(output, max_length=10000)
+            return sanitized_output
         except ConnectionError as e:
             # Log failed execution to history
             self.command_history.append(
@@ -619,7 +626,9 @@ class Agent:
                 print(error_msg)
             return error_msg
         except Exception as e:
-            return f"Error: {e!s}"
+            # Sanitize error before returning
+            sanitized_error = self.data_protector.sanitize_error(str(e))
+            return f"Error: {sanitized_error}"
 
     def get_statistics(self) -> dict[str, Any]:
         """Get session statistics.

@@ -6,6 +6,7 @@ from .audit import AuditLogger, SecurityEventType
 from .commands import Commands
 from .config import ConfigManager
 from .network_device import DeviceConnection
+from .sensitive_data import SensitiveDataProtector
 from .settings import Settings
 from .utils import print_formatted_header, print_line_separator
 
@@ -188,6 +189,9 @@ class UserInterface:
         # Initialize validator with audit logger
         self.validator = InputValidator(audit_logger=self.audit_logger)
 
+        # Initialize data protector for sanitizing logs and output
+        self.data_protector = SensitiveDataProtector()
+
     def _prompt_for_device_credentials(self):
         """Prompt user for device connection details."""
         hostname = input("\nDevice IP: ").strip()
@@ -276,7 +280,9 @@ class UserInterface:
 
             # Log if sanitization changed the query
             if sanitized_question != question and self.assistant.verbose:
-                print(f"[SANITIZED] Original: {question}")
+                # CRITICAL: Don't show original if it might contain secrets
+                safe_original = self.data_protector.sanitize_for_logging(question)
+                print(f"[SANITIZED] Original: {safe_original}")
                 print(f"[SANITIZED] Cleaned:  {sanitized_question}")
 
             # Increment query counter

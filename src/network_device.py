@@ -63,7 +63,8 @@ class DeviceConnection:
                 f"   • Password is correct\n"
                 f"   • Device allows SSH access\n"
                 f"   • Device is running (ping {hostname} first)\n"
-                f"\n   Try manually: ssh {username}@{hostname}"
+                f"\n   Try manually: ssh {username}@{hostname}\n"
+                # CRITICAL: DO NOT include actual password or password hints
             ) from e
 
         except NetmikoTimeoutException as e:
