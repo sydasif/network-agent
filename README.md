@@ -159,6 +159,9 @@ network-agent/
 │   ├── health.py          # Health check functionality
 │   ├── metrics.py         # Metrics dashboard
 │   └── utils.py           # Utilities
+├── examples/               # Example applications and API integrations
+│   ├── health_api_example.py    # Flask health check API example
+│   └── metrics_api_example.py   # Flask metrics API example
 ├── config.yaml             # Configuration file example
 ├── pyproject.toml         # Project dependencies
 ├── .env                   # Environment secrets
@@ -383,13 +386,10 @@ alerts = dashboard.get_alerts()
 
 ### Web API Integration
 
-The application includes example Flask endpoints demonstrating how to integrate health checks and metrics into a web API:
+The application includes example Flask endpoints in the `examples/` directory demonstrating how to integrate health checks and metrics into a web API:
 
-- **`/health`** — Returns detailed health status with appropriate HTTP status codes
-- **`/ready`** — Simple readiness check for container orchestration
-- **`/metrics`** — JSON metrics endpoint for monitoring systems
-- **`/metrics/text`** — Human-readable metrics output
-- **`/metrics/health`** — Health-focused metrics with status
+- **`health_api_example.py`** — Shows health check endpoints (`/health`, `/ready`)
+- **`metrics_api_example.py`** — Shows metrics endpoints (`/metrics`, `/metrics/text`, `/metrics/health`)
 
 For production deployments, these endpoints can be integrated with monitoring systems, load balancers, and orchestration platforms to ensure service availability and automatically handle failures.
 
