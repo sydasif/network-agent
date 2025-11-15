@@ -8,6 +8,7 @@ dependencies = [
     "langchain-groq>=1.0.0",
     "langgraph>=1.0.3",
     "netmiko>=4.6.0",
+    "pytest>=9.0.1",
     "python-dotenv>=1.2.1",
 ]
 
