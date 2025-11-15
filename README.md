@@ -178,7 +178,7 @@ The application uses a unified configuration system through the `Config` class i
 2. **Environment Variables**: Override settings via environment variables
 3. **Runtime Updates**: Dynamically update configuration during execution
 
-The new unified configuration replaces the old split configuration system that used separate `AppConfigManager` and `EnvConfigManager` classes, which are now deprecated.
+The new unified configuration replaces the old split configuration system that used separate `AppConfigManager` and `EnvConfigManager` classes, which have been removed.
 
 ### Configuration File Support (`config.yaml`)
 
@@ -277,16 +277,9 @@ config.update("security", "max_query_length", 1000)
 
 ### Migration from Old Configuration System
 
-The old split configuration system (AppConfigManager and EnvConfigManager) is now deprecated. Here's how to migrate:
+The old split configuration system (AppConfigManager and EnvConfigManager) has been removed. Use the new unified configuration:
 
 ```python
-# Old way (deprecated)
-from src.app_config import AppConfigManager
-from src.env_config import EnvConfigManager
-
-app_config = AppConfigManager()
-env_config = EnvConfigManager()
-
 # New way (recommended)
 from src.config import Config
 
@@ -407,8 +400,6 @@ For production deployments, these endpoints can be integrated with monitoring sy
 | Module | Class | Responsibility |
 |--------|-------|-----------------|
 | `config.py` | `Config` | Unified configuration management (environment variables + YAML) |
-| `app_config.py` | `AppConfigManager` | Legacy application configuration (deprecated) |
-| `env_config.py` | `EnvConfigManager` | Legacy environment configuration (deprecated) |
 | `network_device.py` | `DeviceConnection` | SSH connection and command execution |
 | `agent.py` | `Agent` | LLM setup and AI reasoning |
 | `interface.py` | `UserInterface` | Interactive CLI interface |
