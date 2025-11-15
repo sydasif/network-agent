@@ -5,12 +5,13 @@ This module provides a single configuration interface that combines
 application settings from YAML files with environment variables and secrets.
 """
 
-from typing import Dict, Any, List, Optional
 import os
-import yaml
 from pathlib import Path
-from pydantic import BaseModel, Field, validator
+from typing import Any, List, Optional
+
+import yaml
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 
 class SecurityConfig(BaseModel):
@@ -18,10 +19,24 @@ class SecurityConfig(BaseModel):
     max_queries_per_session: int = 100
     allowed_commands: List[str] = ["show", "display", "get", "dir", "more", "verify"]
     blocked_keywords: List[str] = [
-        "reload", "write", "erase", "delete", "no", "clear",
-        "configure", "conf", "enable", "copy", "format",
-        "shutdown", "boot", "username", "password",
-        "crypto", "key", "certificate"
+        "reload",
+        "write",
+        "erase",
+        "delete",
+        "no",
+        "clear",
+        "configure",
+        "conf",
+        "enable",
+        "copy",
+        "format",
+        "shutdown",
+        "boot",
+        "username",
+        "password",
+        "crypto",
+        "key",
+        "certificate",
     ]
 
 
@@ -75,11 +90,13 @@ class Config:
         """Load configuration from YAML file with environment overrides."""
         # Load base config from YAML
         if not self.config_path.exists():
-            print(f"Warning: Config file {self.config_path} not found. Using default settings.")
+            print(
+                f"Warning: Config file {self.config_path} not found. Using default settings."
+            )
             base_config = {}
         else:
             try:
-                with open(self.config_path, 'r') as f:
+                with open(self.config_path, "r") as f:
                     base_config = yaml.safe_load(f) or {}
             except Exception as e:
                 print(f"Error loading config: {e}. Using defaults.")
@@ -115,16 +132,24 @@ class Config:
             },
             "limits": {
                 "max_commands_per_minute": self._get_env_int("MAX_COMMANDS_PER_MINUTE"),
-                "max_session_duration_minutes": self._get_env_int("MAX_SESSION_DURATION_MINUTES"),
-                "rate_limit_window_seconds": self._get_env_int("RATE_LIMIT_WINDOW_SECONDS"),
-            }
+                "max_session_duration_minutes": self._get_env_int(
+                    "MAX_SESSION_DURATION_MINUTES"
+                ),
+                "rate_limit_window_seconds": self._get_env_int(
+                    "RATE_LIMIT_WINDOW_SECONDS"
+                ),
+            },
         }
 
         # Merge environment overrides (only non-None values)
         def merge_env_overrides(base, overrides):
             for key, value in overrides.items():
                 if value is not None:
-                    if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                    if (
+                        key in base
+                        and isinstance(base[key], dict)
+                        and isinstance(value, dict)
+                    ):
                         merge_env_overrides(base[key], value)
                     else:
                         base[key] = value
@@ -141,7 +166,9 @@ class Config:
             try:
                 return int(value)
             except ValueError:
-                print(f"Warning: Environment variable {key} is not a valid integer: {value}")
+                print(
+                    f"Warning: Environment variable {key} is not a valid integer: {value}"
+                )
                 return None
         return None
 
@@ -152,7 +179,9 @@ class Config:
             try:
                 return float(value)
             except ValueError:
-                print(f"Warning: Environment variable {key} is not a valid float: {value}")
+                print(
+                    f"Warning: Environment variable {key} is not a valid float: {value}"
+                )
                 return None
         return None
 
@@ -162,13 +191,14 @@ class Config:
         if value is not None:
             # Convert common string representations to boolean
             value = value.lower().strip()
-            if value in ('true', '1', 'yes', 'on'):
+            if value in ("true", "1", "yes", "on"):
                 return True
-            elif value in ('false', '0', 'no', 'off', ''):
+            if value in ("false", "0", "no", "off", ""):
                 return False
-            else:
-                print(f"Warning: Environment variable {key} is not a valid boolean: {value}")
-                return None
+            print(
+                f"Warning: Environment variable {key} is not a valid boolean: {value}"
+            )
+            return None
         return None
 
     @property
@@ -188,6 +218,7 @@ class Config:
         if password:
             return password
         import getpass
+
         return getpass.getpass("Password: ")
 
     def reload(self):
