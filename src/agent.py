@@ -1,20 +1,22 @@
 """Agent setup and management for network automation."""
 
 import time
-import uuid
 from collections import deque
 from datetime import datetime
 from typing import Annotated, Any
 
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain.agents import AgentExecutor, create_react_agent  # Updated import
+
+# --- MODIFIED IMPORTS ---
+from langchain_core.messages import BaseMessage
+from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import tool
 from langchain_groq import ChatGroq
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.message import add_messages
-from langgraph.prebuilt import create_react_agent
 from typing_extensions import TypedDict
 
-from .audit import AuditLogger, SecurityEventType
+from .audit import AuditLogger
 from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
 
@@ -46,55 +48,84 @@ class Agent:
         timeout: int = 60,
         audit_logger: AuditLogger = None,
     ) -> None:
-        """Initialize the agent.
-
-        Args:
-            groq_api_key: Groq API key
-            device: DeviceConnection instance
-            model_name: Model to use (openai/gpt-oss-120b,
-                                llama-3.3-70b-versatile, etc.)
-            temperature: Response randomness (0.0-1.0)
-            verbose: Enable detailed logging
-            timeout: API request timeout in seconds
-            audit_logger: Audit logger instance for security events
-        """
+        """Initialize the agent."""
         self.device = device
         self.verbose = verbose
         self.timeout = timeout
         self.command_history = []
         self.groq_api_key = groq_api_key
-
-        # Initialize data protector for sanitizing logs and errors
         self.data_protector = SensitiveDataProtector()
-
-        # Rate limiting
         self.rate_limit_requests = 30
         self.rate_limit_window = 60
         self.request_times = deque()
-
-        # Model fallback tracking
         self.primary_model = model_name
         self.current_model = model_name
         self.temperature = temperature
         self.model_fallback_count = 0
         self.model_usage_stats: dict[str, int] = {}
-
-        # Audit logger
         self.audit_logger = audit_logger
-
-        # Initialize LLM with primary model
         self.llm = self._initialize_llm(model_name, temperature, timeout)
 
-        # Create a tool the AI can use to run commands
+        # --- MODIFIED AGENT CREATION LOGIC ---
         self.execute_command_tool = tool("execute_show_command")(
             self._execute_device_command
         )
 
-        # Create the AI agent with the tool
-        self.agent = create_react_agent(self.llm, [self.execute_command_tool])
+        tools = [self.execute_command_tool]
+
+        # Create the agent runnable using the new, recommended function
+        # For older versions of langchain, create_react_agent requires a prompt
+        template = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
+
+Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
+You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
+
+After executing all necessary commands, provide a clear summary of the results to answer the user's question.
+
+Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
+
+Format your responses in a structured way for network data:
+- Use bullet points for lists of items (interfaces, neighbors, etc.)
+- Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
+- Highlight important values with bold (e.g., **Process ID: 1**)
+- For tables of data, use markdown table format
+- Organize information by category (Configuration, Status, Issues, etc.)
+
+Answer the following questions as best you can. You have access to the following tools:
+
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
+
+        prompt = PromptTemplate.from_template(template)
+        agent_runnable = create_react_agent(self.llm, tools, prompt)
+
+        # Wrap the agent in an AgentExecutor, which is now the standard way to run agents
+        self.agent = AgentExecutor(
+            agent=agent_runnable,
+            tools=tools,
+            verbose=self.verbose,
+            handle_parsing_errors=True,  # Improves robustness
+        )
 
         if self.verbose:
-            print(f"✓ Agent initialized (Model: {model_name}, Temp: {temperature})")
+            print(
+                f"✓ Agent initialized with langchain.agents.create_react_agent (Model: {model_name}, Temp: {temperature})"
+            )
 
     def _initialize_llm(
         self, model_name: str, temperature: float, timeout: int
@@ -132,7 +163,56 @@ class Agent:
             self.current_model = next_model
             self.model_fallback_count += 1
             self.llm = self._initialize_llm(next_model, self.temperature, self.timeout)
-            self.agent = create_react_agent(self.llm, [self.execute_command_tool])
+
+            # Create the agent runnable using the new, recommended function
+            template = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
+
+Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
+You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
+
+After executing all necessary commands, provide a clear summary of the results to answer the user's question.
+
+Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
+
+Format your responses in a structured way for network data:
+- Use bullet points for lists of items (interfaces, neighbors, etc.)
+- Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
+- Highlight important values with bold (e.g., **Process ID: 1**)
+- For tables of data, use markdown table format
+- Organize information by category (Configuration, Status, Issues, etc.)
+
+Answer the following questions as best you can. You have access to the following tools:
+
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
+
+            prompt = PromptTemplate.from_template(template)
+            agent_runnable = create_react_agent(
+                self.llm, [self.execute_command_tool], prompt
+            )
+
+            # Wrap the agent in an AgentExecutor, which is now the standard way to run agents
+            self.agent = AgentExecutor(
+                agent=agent_runnable,
+                tools=[self.execute_command_tool],
+                verbose=self.verbose,
+                handle_parsing_errors=True,  # Improves robustness
+            )
 
             if self.verbose:
                 fb_count = self.model_fallback_count
@@ -290,10 +370,12 @@ class Agent:
         # Check for pipe command chaining
         if "|" in command_stripped:
             # Allow ONLY 'include', 'begin', 'section', and 'exclude' (common Cisco filters)
-            allowed_pipe_commands = ['| include', '| begin', '| section', '| exclude']
+            allowed_pipe_commands = ["| include", "| begin", "| section", "| exclude"]
 
             # Check if pipe is followed by allowed command
-            has_allowed_pipe = any(allowed in command_lower for allowed in allowed_pipe_commands)
+            has_allowed_pipe = any(
+                allowed in command_lower for allowed in allowed_pipe_commands
+            )
 
             if not has_allowed_pipe:
                 msg = (
@@ -516,47 +598,27 @@ class Agent:
         """Execute the agent query and return the result."""
         start_time = time.time()
 
+        # --- MODIFIED INVOKE CALL ---
+        # AgentExecutor expects a dictionary with an "input" key.
         result = self.agent.invoke(
-            {"messages": [("user", full_query)]},
-            config={
-                "recursion_limit": 8,  # Max 8 tool calls
-                "configurable": {"thread_id": str(uuid.uuid4())},
-            },
+            {"input": full_query},
+            config={"recursion_limit": 8},
         )
 
-        # Update elapsed time tracking in a non-breaking way
         self._last_query_time = time.time() - start_time
         return result
 
     def _extract_response(self, result) -> str:
         """Extract the AI response from the result."""
-        # Extract the AI's response (find last AI message, skip tool messages)
-        if isinstance(result, dict) and "messages" in result:
-            messages = result["messages"]
-            response = None
-            for msg in reversed(messages):
-                if isinstance(msg, AIMessage):
-                    response = msg.content
-                    break
+        # --- MODIFIED RESPONSE EXTRACTION ---
+        # AgentExecutor returns a dictionary where the final answer is in the "output" key.
+        if isinstance(result, dict) and "output" in result:
+            return result["output"]
 
-            # If there's no AI message but there were tool messages,
-            # the AI may have needed more steps to process the request
-            if response is None or response == "":
-                # Look for the last AI message that might have requested more steps
-                for msg in reversed(messages):
-                    if hasattr(msg, "tool_calls") and msg.tool_calls:
-                        # If the last message had tool calls but no response,
-                        # it means the AI needed more steps
-                        return "Sorry, need more steps to process this request."
-                    if isinstance(msg, AIMessage) and msg.content:
-                        response = msg.content
-                        break
-                if response is None or response == "":
-                    return "Sorry, need more steps to process this request."
-        else:
-            response = str(result)
-
-        return response
+        # Provide a fallback for any unexpected response structures
+        if self.verbose:
+            print(f"Unexpected agent result structure: {result}")
+        return "Sorry, I encountered an issue processing the response."
 
     def _handle_error(self, e: Exception, retry_count: int) -> str | None:
         """Handle exceptions during query processing."""
@@ -585,13 +647,27 @@ class Agent:
         question_lower = question.lower().strip()
 
         # Direct command indicators
-        command_prefixes = ['show ', 'display ', 'get ', 'dir ', 'configure ', 'reload']
+        command_prefixes = ["show ", "display ", "get ", "dir ", "configure ", "reload"]
 
         # If it starts with a command and has no question words, it's likely a command
         if any(question_lower.startswith(prefix) for prefix in command_prefixes):
-            question_words = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 'can', 'could', 'would', 'should']
+            question_words = [
+                "what",
+                "how",
+                "why",
+                "when",
+                "where",
+                "which",
+                "who",
+                "is",
+                "are",
+                "can",
+                "could",
+                "would",
+                "should",
+            ]
             has_question_word = any(word in question_lower for word in question_words)
-            has_question_mark = '?' in question
+            has_question_mark = "?" in question
 
             # If no question indicators, it's probably a direct command
             if not has_question_word and not has_question_mark:
@@ -622,7 +698,9 @@ class Agent:
             )
 
             # Sanitize output before returning
-            sanitized_output = self.data_protector.sanitize_output(output, max_length=10000)
+            sanitized_output = self.data_protector.sanitize_output(
+                output, max_length=10000
+            )
             return sanitized_output
         except ConnectionError as e:
             # Log failed execution to history
