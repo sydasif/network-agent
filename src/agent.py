@@ -1,11 +1,12 @@
 """Agent setup and management for network automation."""
 
+import sys
 import time
 from collections import deque
 from datetime import datetime
 from typing import Annotated, Any
 
-from langchain.agents import AgentExecutor, create_react_agent  # Updated import
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 
 # --- MODIFIED IMPORTS ---
 from langchain_core.messages import BaseMessage
@@ -19,6 +20,43 @@ from typing_extensions import TypedDict
 from .audit import AuditLogger
 from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
+
+
+class Colors:
+    """ANSI color codes for terminal output."""
+    # Text colors
+    GREEN = '\033[92m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    YELLOW = '\033[93m'
+    MAGENTA = '\033[95m'
+    RED = '\033[91m'
+    WHITE = '\033[97m'
+    GRAY = '\033[90m'
+
+    # Text styles
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    UNDERLINE = '\033[4m'
+
+    # Reset
+    RESET = '\033[0m'
+
+    @staticmethod
+    def disable():
+        """Disable colors (for non-terminal environments)."""
+        Colors.GREEN = ''
+        Colors.BLUE = ''
+        Colors.CYAN = ''
+        Colors.YELLOW = ''
+        Colors.MAGENTA = ''
+        Colors.RED = ''
+        Colors.WHITE = ''
+        Colors.GRAY = ''
+        Colors.BOLD = ''
+        Colors.DIM = ''
+        Colors.UNDERLINE = ''
+        Colors.RESET = ''
 
 
 # Model fallback chain - order matters (primary to fallback)
@@ -76,66 +114,57 @@ class Agent:
         self.audit_logger = audit_logger
         self.llm = self._initialize_llm(model_name, temperature, timeout)
 
+        # Check if we're in a terminal that supports colors
+        if not sys.stdout.isatty():
+            Colors.disable()
+
         # --- MODIFIED AGENT CREATION LOGIC ---
+        from langchain_core.prompts import ChatPromptTemplate
+
         self.execute_command_tool = tool("execute_show_command")(
             self._execute_device_command
         )
-
         tools = [self.execute_command_tool]
 
-        # Create the agent runnable using the new, recommended function
-        # For older versions of langchain, create_react_agent requires a prompt
-        template = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
+        # Create a simpler prompt for tool calling
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a network engineer assistant with access to network devices.
 
-Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
-You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
+Your capabilities:
+- Execute read-only show commands using execute_show_command
+- Analyze command output
+- Provide clear, structured responses
 
-After executing all necessary commands, provide a clear summary of the results to answer the user's question.
+When answering:
+1. Run necessary commands to gather information
+2. Analyze the output
+3. Provide a well-formatted response with:
+   - Clear headings (## Heading)
+   - Bullet points for lists
+   - Tables for structured data
+   - Bold for important values (**value**)
 
-Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
+Only use the execute_show_command tool. Never suggest configuration changes."""),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
 
-Format your responses in a structured way for network data:
-- Use bullet points for lists of items (interfaces, neighbors, etc.)
-- Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
-- Highlight important values with bold (e.g., **Process ID: 1**)
-- For tables of data, use markdown table format
-- Organize information by category (Configuration, Status, Issues, etc.)
+        # Create agent with tool calling (more reliable than ReAct)
+        agent_runnable = create_tool_calling_agent(self.llm, tools, prompt)
 
-Answer the following questions as best you can. You have access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-
-Question: {input}
-Thought:{agent_scratchpad}"""
-
-        prompt = PromptTemplate.from_template(template)
-        agent_runnable = create_react_agent(self.llm, tools, prompt)
-
-        # Wrap the agent in an AgentExecutor, which is now the standard way to run agents
+        # Configure executor WITHOUT verbose flag
+        # (we'll handle verbose logging manually where needed)
         self.agent = AgentExecutor(
             agent=agent_runnable,
             tools=tools,
-            verbose=self.verbose,
-            handle_parsing_errors=True,  # Improves robustness
+            verbose=False,  # Always False to avoid callback errors
+            handle_parsing_errors=True,
+            max_iterations=5,
+            return_intermediate_steps=self.verbose,  # Store steps if verbose
         )
 
         if self.verbose:
-            print(
-                f"✓ Agent initialized with langchain.agents.create_react_agent (Model: {model_name}, Temp: {temperature})"
-            )
+            print(f"✓ Agent initialized with tool calling (Model: {model_name})")
 
     def _initialize_llm(
         self, model_name: str, temperature: float, timeout: int
@@ -175,53 +204,43 @@ Thought:{agent_scratchpad}"""
             self.llm = self._initialize_llm(next_model, self.temperature, self.timeout)
 
             # Create the agent runnable using the new, recommended function
-            template = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
+            from langchain_core.prompts import ChatPromptTemplate
 
-Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
-You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
+            # Create a simpler prompt for tool calling
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are a network engineer assistant with access to network devices.
 
-After executing all necessary commands, provide a clear summary of the results to answer the user's question.
+Your capabilities:
+- Execute read-only show commands using execute_show_command
+- Analyze command output
+- Provide clear, structured responses
 
-Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
+When answering:
+1. Run necessary commands to gather information
+2. Analyze the output
+3. Provide a well-formatted response with:
+   - Clear headings (## Heading)
+   - Bullet points for lists
+   - Tables for structured data
+   - Bold for important values (**value**)
 
-Format your responses in a structured way for network data:
-- Use bullet points for lists of items (interfaces, neighbors, etc.)
-- Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
-- Highlight important values with bold (e.g., **Process ID: 1**)
-- For tables of data, use markdown table format
-- Organize information by category (Configuration, Status, Issues, etc.)
+Only use the execute_show_command tool. Never suggest configuration changes."""),
+                ("human", "{input}"),
+                ("placeholder", "{agent_scratchpad}"),
+            ])
 
-Answer the following questions as best you can. You have access to the following tools:
+            # Create agent with tool calling (more reliable than ReAct)
+            agent_runnable = create_tool_calling_agent(self.llm, [self.execute_command_tool], prompt)
 
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-
-Question: {input}
-Thought:{agent_scratchpad}"""
-
-            prompt = PromptTemplate.from_template(template)
-            agent_runnable = create_react_agent(
-                self.llm, [self.execute_command_tool], prompt
-            )
-
-            # Wrap the agent in an AgentExecutor, which is now the standard way to run agents
+            # Configure executor WITHOUT verbose flag
+            # (we'll handle verbose logging manually where needed)
             self.agent = AgentExecutor(
                 agent=agent_runnable,
                 tools=[self.execute_command_tool],
-                verbose=self.verbose,
-                handle_parsing_errors=True,  # Improves robustness
+                verbose=False,  # Always False to avoid callback errors
+                handle_parsing_errors=True,
+                max_iterations=5,
+                return_intermediate_steps=self.verbose,  # Store steps if verbose
             )
 
             if self.verbose:
@@ -236,17 +255,7 @@ Thought:{agent_scratchpad}"""
             return False
 
     def _execute_device_command(self, command: str) -> str:
-        """Execute a command on the device (used by AI) with safety constraints.
-
-        Only allows read-only commands to prevent accidental or malicious
-        configuration changes.
-
-        Args:
-            command: Command to execute
-
-        Returns:
-            Command output or error message if blocked
-        """
+        """Execute command with color-coded verbose output."""
         # Normalize command for validation
         command_stripped = command.strip()
         command_lower = command_stripped.lower()
@@ -396,7 +405,9 @@ Thought:{agent_scratchpad}"""
         timestamp = datetime.now().isoformat()
         try:
             if self.verbose:
-                print(f"[{timestamp}] ✅ Executing (validated): {command_stripped}")
+                print(f"{Colors.GRAY}[{timestamp}]{Colors.RESET} "
+                      f"{Colors.GREEN}✅ Executing (validated):{Colors.RESET} "
+                      f"{Colors.WHITE}{command_stripped}{Colors.RESET}")
 
             output = self.device.execute_command(command_stripped)
 
@@ -434,7 +445,7 @@ Thought:{agent_scratchpad}"""
             )
             # Return clear message to AI that connection is dead
             error_msg = (
-                f"❌ Connection Error: {e!s}\n\n"
+                f"{Colors.RED}❌ Connection Error: {e}{Colors.RESET}\n\n"
                 "The device connection has failed. "
                 "Please inform the user they need to restart the application."
             )
@@ -461,7 +472,7 @@ Thought:{agent_scratchpad}"""
                     "validated": True,
                 }
             )
-            error_msg = f"⚠ Error executing command: {e!s}"
+            error_msg = f"{Colors.YELLOW}⚠️  Error: {e}{Colors.RESET}"
             if self.verbose:
                 print(f"[{timestamp}] {error_msg}")
 
@@ -550,14 +561,11 @@ Thought:{agent_scratchpad}"""
 
             response = self._extract_response(result)
 
+            # ONLY PRINT COMPLETION MESSAGE HERE (once)
             if self.verbose:
-                start_time = (
-                    time.time() - 0.1
-                )  # Approximate time, actual time is not tracked here
-                elapsed_time = time.time() - start_time
-                print(
-                    f"✓ Query completed in {elapsed_time:.2f}s (Model: {self.current_model})"
-                )
+                print(f"\n{Colors.GREEN}✓ Query completed in {self._last_query_time:.2f}s{Colors.RESET} "
+                      f"{Colors.GRAY}(Model: {self.current_model}){Colors.RESET}")
+                print()  # Add blank line for spacing
 
             return response
 
@@ -575,29 +583,55 @@ Thought:{agent_scratchpad}"""
             return self._handle_error(e, retry_count)
 
     def _execute_agent_query(self, full_query: str):
-        """Execute the agent query and return the result."""
+        """Execute the agent query with styled verbose logging."""
         start_time = time.time()
 
-        # --- MODIFIED INVOKE CALL ---
-        # AgentExecutor expects a dictionary with an "input" key.
+        if self.verbose:
+            print(f"\n{Colors.CYAN}{'='*60}{Colors.RESET}")
+            print(f"{Colors.BOLD}{Colors.BLUE}🤖 Processing Query:{Colors.RESET} {Colors.WHITE}{full_query[:50]}{'...' if len(full_query) > 50 else ''}{Colors.RESET}")
+            print(f"{Colors.CYAN}{'='*60}{Colors.RESET}")
+
+        # Execute
         result = self.agent.invoke(
             {"input": full_query},
             config={"recursion_limit": 8},
         )
 
         self._last_query_time = time.time() - start_time
+
+        # Enhanced verbose logging with colors
+        if self.verbose and "intermediate_steps" in result:
+            print(f"\n{Colors.GRAY}{'─'*60}{Colors.RESET}")
+            print(f"{Colors.BOLD}{Colors.MAGENTA}📋 Execution Steps{Colors.RESET}")
+            print(f"{Colors.GRAY}{'─'*60}{Colors.RESET}")
+
+            for i, (action, observation) in enumerate(result["intermediate_steps"], 1):
+                print(f"\n{Colors.YELLOW}📍 Step {i}:{Colors.RESET}")
+                print(f"   {Colors.CYAN}🔧 Tool:{Colors.RESET} {Colors.WHITE}{action.tool}{Colors.RESET}")
+                print(f"   {Colors.CYAN}📝 Input:{Colors.RESET} {Colors.WHITE}{action.tool_input}{Colors.RESET}")
+
+                # Smart truncation based on output size
+                if len(observation) > 500:
+                    preview = observation[:250] + f"\n   {Colors.DIM}[...truncated...]{Colors.RESET}\n   " + observation[-250:]
+                    print(f"   {Colors.CYAN}📤 Output:{Colors.RESET} {Colors.WHITE}{preview}{Colors.RESET}")
+                else:
+                    print(f"   {Colors.CYAN}📤 Output:{Colors.RESET} {Colors.WHITE}{observation}{Colors.RESET}")
+
+            print(f"\n{Colors.GRAY}{'─'*60}{Colors.RESET}")
+            print(f"{Colors.GREEN}⏱️  Total time: {self._last_query_time:.2f}s{Colors.RESET}")
+            print(f"{Colors.GRAY}{'─'*60}{Colors.RESET}")
+
         return result
 
     def _extract_response(self, result) -> str:
         """Extract the AI response from the result."""
-        # --- MODIFIED RESPONSE EXTRACTION ---
-        # AgentExecutor returns a dictionary where the final answer is in the "output" key.
+        # DO NOT print completion message here - it will be printed in _process_query_with_retry
+
         if isinstance(result, dict) and "output" in result:
             return result["output"]
 
-        # Provide a fallback for any unexpected response structures
         if self.verbose:
-            print(f"Unexpected agent result structure: {result}")
+            print(f"{Colors.RED}Unexpected agent result structure: {result}{Colors.RESET}")
         return "Sorry, I encountered an issue processing the response."
 
     def _handle_error(self, e: Exception, retry_count: int) -> str | None:

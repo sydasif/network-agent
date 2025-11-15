@@ -11,6 +11,16 @@ from .settings import Settings
 from .utils import print_formatted_header, print_line_separator
 
 
+class InterfaceColors:
+    """Colors for user interface elements."""
+    PROMPT = '\033[96m'      # Cyan for prompts
+    SUCCESS = '\033[92m'     # Green for success
+    ERROR = '\033[91m'       # Red for errors
+    WARNING = '\033[93m'     # Yellow for warnings
+    INFO = '\033[94m'        # Blue for info
+    RESET = '\033[0m'
+
+
 class InputValidator:
     """Validate and sanitize user input."""
 
@@ -224,7 +234,7 @@ class UserInterface:
         )
 
     def _run_interactive_session(self):
-        """Run the interactive chat session with input validation."""
+        """Run the interactive chat session with styled output."""
         print("\n" + "=" * 60)
         print("Ready! Type '/help' for commands or 'quit' to exit")
         print("=" * 60 + "\n")
@@ -239,9 +249,10 @@ class UserInterface:
                 break
 
             try:
-                question = input("\n💬 Ask: ").strip()
+                # Colored prompt
+                question = input(f"\n{InterfaceColors.PROMPT}💬 Ask:{InterfaceColors.RESET} ").strip()
             except (KeyboardInterrupt, EOFError):
-                print("\n\n👋 Interrupted. Exiting...")
+                print(f"\n\n{InterfaceColors.INFO}👋 Interrupted. Exiting...{InterfaceColors.RESET}")
                 break
 
             # Handle exit commands
@@ -301,14 +312,26 @@ class UserInterface:
 
             # Process the validated and sanitized query
             print_line_separator()
+
             try:
                 answer = self.assistant.answer_question(sanitized_question)
+
+                # Add spacing before the answer for better readability
+                if self.assistant.verbose:
+                    # Verbose mode already adds spacing via _extract_response
+                    pass
+                else:
+                    # Non-verbose mode needs a blank line after separator
+                    print()
+
                 print(answer)
+
             except Exception as e:
                 print(f"❌ Error processing query: {e!s}")
                 if self.assistant and self.assistant.verbose:
                     import traceback
                     traceback.print_exc()
+
             print_line_separator()
 
     def run(self):
