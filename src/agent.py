@@ -515,43 +515,21 @@ Thought:{agent_scratchpad}"""
             wait_time = self.rate_limit_window - (time.time() - self.request_times[0])
             return f"⚠ Rate limit exceeded. Please wait {int(wait_time)}s."
 
-        # Build the full query with system prompt
-        full_query = self._build_query(question, context)
+        # The system prompt is now part of the agent's definition,
+        # so we no longer need to build the full query here.
+        # We simply pass the user's question as the input.
 
         max_retries = len(MODEL_FALLBACK_CHAIN)
         retry_count = 0
 
         while retry_count < max_retries:
-            response = self._process_query_with_retry(full_query, retry_count)
+            # Pass the user's question directly to the retry processor
+            response = self._process_query_with_retry(question, retry_count)
             if response is not None:
                 return response
             retry_count += 1
 
         return "❌ All models failed. No more fallback models available."
-
-    def _build_query(self, question: str, context: str | None = None) -> str:
-        """Build the full query with system prompt."""
-        system_prompt = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
-
-        Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
-        You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
-
-        After executing all necessary commands, provide a clear summary of the results to answer the user's question.
-
-        Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
-
-        Format your responses in a structured way for network data:
-        - Use bullet points for lists of items (interfaces, neighbors, etc.)
-        - Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
-        - Highlight important values with bold (e.g., **Process ID: 1**)
-        - For tables of data, use markdown table format
-        - Organize information by category (Configuration, Status, Issues, etc.)"""
-
-        if context:
-            system_prompt += f"\n\nAdditional context: {context}"
-
-        # Combine system prompt with user query
-        return f"{system_prompt}\n\nUser question: {question}"
 
     def _process_query_with_retry(
         self, full_query: str, retry_count: int
@@ -698,10 +676,7 @@ Thought:{agent_scratchpad}"""
             )
 
             # Sanitize output before returning
-            sanitized_output = self.data_protector.sanitize_output(
-                output, max_length=10000
-            )
-            return sanitized_output
+            return self.data_protector.sanitize_output(output, max_length=10000)
         except ConnectionError as e:
             # Log failed execution to history
             self.command_history.append(
