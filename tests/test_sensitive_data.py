@@ -78,11 +78,11 @@ class TestSensitiveDataProtector(unittest.TestCase):
         # The truncation will cut off the replaced secret, but the replacement should have happened
         # before the truncation
 
-        # Calculate the actual length of text before truncation
-        original_start = "a" * 1005 + " "
         # The password replacement would have happened in the original text before truncation
         # So test that when truncation is not applied we get the correct result
-        full_sanitized = self.protector.sanitize_output("a" * 1005 + " password admin123", max_length=0)
+        full_sanitized = self.protector.sanitize_output(
+            "a" * 1005 + " password admin123", max_length=0
+        )
         # This should contain [SECRET_REDACTED]
         self.assertIn("[SECRET_REDACTED]", full_sanitized)
 

@@ -1,6 +1,6 @@
 """Agent setup and management for network automation."""
 
-import sys
+import logging
 from typing import Annotated
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -16,30 +16,10 @@ from .exceptions import CommandBlockedError
 from .network_device import DeviceConnection
 from .security import CommandSecurityPolicy
 from .sensitive_data import SensitiveDataProtector
+from .logging_config import get_verbose_logger
 
-
-class Colors:
-    """ANSI color codes for terminal output."""
-
-    GREEN = "\033[92m"
-    BLUE = "\033[94m"
-    CYAN = "\033[96m"
-    YELLOW = "\033[93m"
-    MAGENTA = "\033[95m"
-    RED = "\033[91m"
-    WHITE = "\033[97m"
-    GRAY = "\033[90m"
-    BOLD = "\033[1m"
-    DIM = "\033[2m"
-    UNDERLINE = "\033[4m"
-    RESET = "\033[0m"
-
-    @staticmethod
-    def disable():
-        """Disable colors for non-terminal environments."""
-        for attr in dir(Colors):
-            if attr.isupper():
-                setattr(Colors, attr, "")
+logger = logging.getLogger("net_agent.agent")
+verbose_logger = get_verbose_logger()
 
 
 class AgentState(TypedDict):
@@ -73,10 +53,13 @@ class Agent:
         self.security_policy = CommandSecurityPolicy()
         self.llm = self._initialize_llm(model_name, temperature, timeout)
 
-        if not sys.stdout.isatty():
-            Colors.disable()
+        if self.verbose:
+            verbose_logger.setLevel(logging.DEBUG)
+        else:
+            verbose_logger.setLevel(logging.INFO)
 
         from langchain_core.prompts import ChatPromptTemplate
+        from .prompts import SYSTEM_PROMPT
 
         self.execute_command_tool = tool("execute_show_command")(
             self._execute_device_command
@@ -85,7 +68,7 @@ class Agent:
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", "You are a network engineer assistant..."),
+                ("system", SYSTEM_PROMPT),
                 ("human", "{input}"),
                 ("placeholder", "{agent_scratchpad}"),
             ]
@@ -101,8 +84,7 @@ class Agent:
             return_intermediate_steps=self.verbose,
         )
 
-        if self.verbose:
-            print(f"✓ Agent initialized (Model: {model_name})")
+        logger.info("Agent initialized with model: %s", model_name)
 
     def _initialize_llm(
         self, model_name: str, temperature: float, timeout: int
@@ -128,8 +110,7 @@ class Agent:
     def _execute_validated_command(self, command: str) -> str:
         """Execute a validated command."""
         try:
-            if self.verbose:
-                print(f"{Colors.GRAY}Executing:{Colors.RESET} {command}")
+            verbose_logger.debug("Executing: %s", command)
             output = self.device.execute_command(command)
             if self.audit_logger:
                 self.audit_logger.log_command_executed(
@@ -152,14 +133,12 @@ class Agent:
     def answer_question(self, question: str) -> str:
         """Answer a question about the device."""
         try:
-            if self.verbose:
-                print(f"\n{Colors.CYAN}Processing Query...{Colors.RESET}")
+            verbose_logger.info("Processing Query...")
             result = self.agent.invoke(
                 {"input": question}, config={"recursion_limit": 8}
             )
             response = self._extract_response(result)
-            if self.verbose:
-                print(f"\n{Colors.GREEN}✓ Query completed.{Colors.RESET}")
+            verbose_logger.info("Query completed.")
             return response
         except GraphRecursionError:
             return "⚠ Agent exceeded maximum iterations. Try a simpler query."

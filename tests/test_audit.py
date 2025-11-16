@@ -17,7 +17,7 @@ class TestAuditLogger(unittest.TestCase):
             log_dir=self.temp_dir,
             enable_console=False,
             enable_file=True,
-            log_level="INFO"
+            log_level="INFO",
         )
 
     def tearDown(self):
@@ -30,7 +30,9 @@ class TestAuditLogger(unittest.TestCase):
 
     def test_log_session_start(self):
         """Test logging session start."""
-        self.audit_logger.log_session_start("test_user", "192.168.1.1", "llama-3.3-70b-versatile")
+        self.audit_logger.log_session_start(
+            "test_user", "192.168.1.1", "llama-3.3-70b-versatile"
+        )
         # This should not raise an exception
 
     def test_log_connection_established(self):
@@ -40,17 +42,23 @@ class TestAuditLogger(unittest.TestCase):
 
     def test_log_connection_failed(self):
         """Test logging connection failed."""
-        self.audit_logger.log_connection_failed("192.168.1.1", "admin", "Authentication failed")
+        self.audit_logger.log_connection_failed(
+            "192.168.1.1", "admin", "Authentication failed"
+        )
         # This should not raise an exception
 
     def test_log_command_executed_success(self):
         """Test logging successful command execution."""
-        self.audit_logger.log_command_executed("show version", success=True, output_length=100)
+        self.audit_logger.log_command_executed(
+            "show version", success=True, output_length=100
+        )
         # This should not raise an exception
 
     def test_log_command_executed_failure(self):
         """Test logging failed command execution."""
-        self.audit_logger.log_command_executed("show version", success=False, error="Command failed")
+        self.audit_logger.log_command_executed(
+            "show version", success=False, error="Command failed"
+        )
         # This should not raise an exception
 
     def test_log_event(self):
@@ -66,7 +74,9 @@ class TestAuditLogger(unittest.TestCase):
     def test_log_sanitization(self):
         """Test that logs are properly sanitized."""
         sensitive_command = "password secret123"
-        self.audit_logger.log_command_executed(sensitive_command, success=True, output_length=50)
+        self.audit_logger.log_command_executed(
+            sensitive_command, success=True, output_length=50
+        )
         # This should not raise an exception and should sanitize the command
 
 

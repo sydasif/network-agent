@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     Centralized configuration for the network agent.
     Settings are loaded from environment variables.
     """
+
     # Model settings
     model_name: str = "llama-3.3-70b-versatile"
     temperature: float = 0.1
@@ -19,12 +20,28 @@ class Settings(BaseSettings):
     max_queries_per_session: int = 100
     allowed_commands: List[str] = ["show", "display", "get", "dir", "more", "verify"]
     blocked_keywords: List[str] = [
-        "reload", "write", "erase", "delete", "no", "clear", "configure",
-        "conf", "enable", "copy", "format", "shutdown", "boot",
-        "username", "password", "crypto", "key", "certificate"
+        "reload",
+        "write",
+        "erase",
+        "delete",
+        "no",
+        "clear",
+        "configure",
+        "conf",
+        "enable",
+        "copy",
+        "format",
+        "shutdown",
+        "boot",
+        "username",
+        "password",
+        "crypto",
+        "key",
+        "certificate",
     ]
 
     # Logging settings
+    verbose: bool = False
     log_level: str = "INFO"
     log_directory: str = "logs"
     enable_console_logging: bool = True
@@ -36,10 +53,13 @@ class Settings(BaseSettings):
     command_timeout: int = 60
     banner_timeout: int = 15
     global_delay_factor: int = 2
-    
+
     # API Keys
     groq_api_key: str
-    
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
 
 settings = Settings()

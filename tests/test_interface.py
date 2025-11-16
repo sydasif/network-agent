@@ -1,11 +1,9 @@
 """Tests for the UserInterface class."""
 
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
-import sys
+from unittest.mock import Mock, patch
 from src.interface import UserInterface, InputValidator
-from src.audit import AuditLogger, SecurityEventType
+from src.audit import AuditLogger
 from src.exceptions import QueryTooLongError, BlockedContentError
 
 
@@ -15,7 +13,9 @@ class TestInputValidator(unittest.TestCase):
     def setUp(self):
         """Set up the test case."""
         self.mock_audit = Mock(spec=AuditLogger)
-        self.validator = InputValidator(audit_logger=self.mock_audit, max_query_length=500)
+        self.validator = InputValidator(
+            audit_logger=self.mock_audit, max_query_length=500
+        )
 
     def test_validate_query_empty(self):
         """Test validating an empty query."""
@@ -73,13 +73,13 @@ class TestUserInterface(unittest.TestCase):
 
         # Patch all the imports for the interface module
         self.patches = [
-            patch('src.interface.DeviceConnection'),
-            patch('src.interface.Agent'),
-            patch('src.interface.AuditLogger'),
-            patch('src.interface.SensitiveDataProtector'),
-            patch('src.interface.settings'),
-            patch('src.interface.print_formatted_header'),
-            patch('src.interface.print_line_separator'),
+            patch("src.interface.DeviceConnection"),
+            patch("src.interface.Agent"),
+            patch("src.interface.AuditLogger"),
+            patch("src.interface.SensitiveDataProtector"),
+            patch("src.interface.settings"),
+            patch("src.interface.print_formatted_header"),
+            patch("src.interface.print_line_separator"),
         ]
 
         self.mock_device_class = self.patches[0].start()
@@ -93,14 +93,14 @@ class TestUserInterface(unittest.TestCase):
         # Set up mock settings
         self.mock_settings.max_queries_per_session = 10
         self.mock_settings.max_query_length = 500
-        self.mock_settings.groq_api_key = 'test_key'
-        self.mock_settings.model_name = 'test-model'
+        self.mock_settings.groq_api_key = "test_key"
+        self.mock_settings.model_name = "test-model"
         self.mock_settings.temperature = 0.1
         self.mock_settings.api_timeout = 60
-        self.mock_settings.log_directory = 'logs'
+        self.mock_settings.log_directory = "logs"
         self.mock_settings.enable_console_logging = True
         self.mock_settings.enable_file_logging = True
-        self.mock_settings.log_level = 'INFO'
+        self.mock_settings.log_level = "INFO"
 
         # Create mocks for device and agent
         self.mock_device = Mock()
@@ -124,22 +124,22 @@ class TestUserInterface(unittest.TestCase):
         self.assertEqual(ui.max_queries_per_session, 10)
         self.assertEqual(ui.query_count, 0)
 
-    @patch('src.interface.getpass.getpass')
-    @patch('builtins.input')
+    @patch("src.interface.getpass.getpass")
+    @patch("builtins.input")
     def test_run_method_calls_components(self, mock_input, mock_getpass):
         """Test that run method calls the necessary components."""
         # Setup mock inputs
         mock_input.side_effect = [
             "192.168.1.1",  # hostname
-            "admin",        # username
-            "quit"          # question to quit
+            "admin",  # username
+            "quit",  # question to quit
         ]
         mock_getpass.return_value = "password"
 
         ui = UserInterface()
 
         # Mock both the setup and connect methods to avoid actual connection attempts
-        with patch.object(ui, '_setup_network_assistant') as mock_setup:
+        with patch.object(ui, "_setup_network_assistant") as mock_setup:
             # Make sure the device connection mock works
             ui.device = self.mock_device
             ui.assistant = self.mock_agent
@@ -149,7 +149,7 @@ class TestUserInterface(unittest.TestCase):
             ui.audit_logger.log_connection_established = Mock()
             ui.audit_logger.log_session_start = Mock()
 
-            with patch.object(ui, '_run_interactive_session') as mock_run:
+            with patch.object(ui, "_run_interactive_session") as mock_run:
                 ui.run()
 
                 # Assertions

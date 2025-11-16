@@ -24,29 +24,41 @@ class CommandSecurityPolicy:
         if not command_stripped:
             raise CommandBlockedError(command, "Empty command")
 
-        if error_reason := self._check_blocked_keywords(command_stripped, command_lower):
+        if error_reason := self._check_blocked_keywords(
+            command_stripped, command_lower
+        ):
             raise CommandBlockedError(command, error_reason)
 
         if error_reason := self._check_allowed_prefix(command_stripped, command_lower):
             raise CommandBlockedError(command, error_reason)
 
-        if error_reason := self._check_command_chaining(command_stripped, command_lower):
+        if error_reason := self._check_command_chaining(
+            command_stripped, command_lower
+        ):
             raise CommandBlockedError(command, error_reason)
 
-    def _check_blocked_keywords(self, command_stripped: str, command_lower: str) -> Optional[str]:
+    def _check_blocked_keywords(
+        self, command_stripped: str, command_lower: str
+    ) -> Optional[str]:
         """Check for blocked keywords."""
         for blocked in settings.blocked_keywords:
             if blocked in command_lower:
                 return f"Blocked keyword '{blocked}'"
         return None
 
-    def _check_allowed_prefix(self, command_stripped: str, command_lower: str) -> Optional[str]:
+    def _check_allowed_prefix(
+        self, command_stripped: str, command_lower: str
+    ) -> Optional[str]:
         """Check for allowed command prefixes."""
-        if not any(command_lower.startswith(prefix) for prefix in settings.allowed_commands):
+        if not any(
+            command_lower.startswith(prefix) for prefix in settings.allowed_commands
+        ):
             return "Command does not start with an allowed prefix"
         return None
 
-    def _check_command_chaining(self, command_stripped: str, command_lower: str) -> Optional[str]:
+    def _check_command_chaining(
+        self, command_stripped: str, command_lower: str
+    ) -> Optional[str]:
         """Check for command chaining."""
         if ";" in command_stripped:
             return "Semicolon command chaining is not allowed"

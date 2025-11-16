@@ -1,8 +1,9 @@
 """User interface for network automation agent."""
 
 import re
-import time
 import getpass
+import logging
+import sys
 from .agent import Agent
 from .audit import AuditLogger, SecurityEventType
 from .exceptions import QueryTooLongError, BlockedContentError
@@ -10,16 +11,26 @@ from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
 from .settings import settings
 from .utils import print_formatted_header, print_line_separator
+from .logging_config import setup_logging
+
+logger = logging.getLogger("net_agent.interface")
 
 
-class InterfaceColors:
-    """Colors for user interface elements."""
-    PROMPT = '\033[96m'      # Cyan for prompts
-    SUCCESS = '\033[92m'     # Green for success
-    ERROR = '\033[91m'       # Red for errors
-    WARNING = '\033[93m'     # Yellow for warnings
-    INFO = '\033[94m'        # Blue for info
-    RESET = '\033[0m'
+class ConsoleColors:
+    """Console colors for user-facing messages only."""
+
+    PROMPT = "\033[96m"  # Cyan for prompts
+    SUCCESS = "\033[92m"  # Green for success
+    ERROR = "\033[91m"  # Red for errors
+    WARNING = "\033[93m"  # Yellow for warnings
+    INFO = "\033[94m"  # Blue for info
+    RESET = "\033[0m"
+
+    @staticmethod
+    def colorize(text: str, color: str) -> str:
+        if not sys.stdout.isatty():
+            return text
+        return f"{color}{text}{ConsoleColors.RESET}"
 
 
 class InputValidator:
@@ -42,42 +53,44 @@ class InputValidator:
             query: User input query
 
         Raises:
-            QueryTooLongError: If query exceeds maximum length
-            BlockedContentError: If query contains blocked patterns
+            QueryTooLongError: If query exceeds length limits
+            BlockedContentError: If query contains blocked content
         """
         # Check if query is empty
         if not query or not query.strip():
-            raise BlockedContentError(query, "Empty query")
+            if self.audit_logger:
+                self.audit_logger.log(
+                    SecurityEventType.ERROR,
+                    f"Validation failed: Empty query. Query: {query[:200]}",
+                    severity="warning",
+                )
+            raise BlockedContentError(query, "empty")
 
         # Check length limits (now configurable)
         if len(query) > self.max_query_length:
-            error_message = (
-                f"❌ Query too long ({len(query)} characters)\n"
-                f"   Maximum allowed: {self.max_query_length} characters\n"
-                f"   Please shorten your question."
-            )
-
             # Log validation failure to audit system
             if self.audit_logger:
-                self.audit_logger.log(SecurityEventType.ERROR, f"Validation failed: Length exceeded. Query: {query[:200]}", severity="warning")
+                self.audit_logger.log(
+                    SecurityEventType.ERROR,
+                    f"Validation failed: Length exceeded. Query: {query[:200]}",
+                    severity="warning",
+                )
 
-            raise QueryTooLongError(len(query), self.max_query_length)
+            raise QueryTooLongError(length=len(query), max_length=self.max_query_length)
 
         # Check for blocked patterns (immediate rejection)
         query_lower = query.lower()
         for pattern in settings.blocked_keywords:
             if re.search(pattern, query_lower, re.IGNORECASE):
-                error_message = (
-                    f"❌ Query contains blocked content\n"
-                    f"   Pattern detected: {pattern}\n"
-                    f"   This type of input is not allowed for security reasons."
-                )
-
                 # Log validation failure to audit system
                 if self.audit_logger:
-                    self.audit_logger.log(SecurityEventType.ERROR, f"Validation failed: Blocked pattern: {pattern}. Query: {query[:200]}", severity="critical")
+                    self.audit_logger.log(
+                        SecurityEventType.ERROR,
+                        f"Validation failed: Blocked pattern: {pattern}. Query: {query[:200]}",
+                        severity="critical",
+                    )
 
-                raise BlockedContentError(query, pattern)
+                raise BlockedContentError(content=query, pattern=pattern)
 
     @staticmethod
     def sanitize_query(query: str) -> str:
@@ -90,19 +103,19 @@ class InputValidator:
             Sanitized query safe for LLM processing
         """
         # Remove null bytes
-        query = query.replace('\x00', '')
+        query = query.replace("\x00", "")
 
         # Remove excessive whitespace
-        query = ' '.join(query.split())
+        query = " ".join(query.split())
 
         # Remove HTML/XML tags
-        query = re.sub(r'<[^>]+>', '', query)
+        query = re.sub(r"<[^>]+>", "", query)
 
         # Escape backticks (prevent code block injection)
-        query = query.replace('`', "'")
+        query = query.replace("`", "'")
 
         # Limit consecutive special characters
-        query = re.sub(r'([^Ws])\1{3,}', r'\1\1', query)
+        query = re.sub(r"([^Ws])\1{3,}", r"\1\1", query)
 
         return query.strip()
 
@@ -112,6 +125,7 @@ class UserInterface:
 
     def __init__(self):
         """Initialize the user interface."""
+        setup_logging(verbose=settings.verbose)
         self.device = None
         self.assistant = None
         self.query_count = 0
@@ -126,8 +140,7 @@ class UserInterface:
         )
 
         self.validator = InputValidator(
-            audit_logger=self.audit_logger,
-            max_query_length=settings.max_query_length
+            audit_logger=self.audit_logger, max_query_length=settings.max_query_length
         )
 
         self.data_protector = SensitiveDataProtector()
@@ -147,31 +160,40 @@ class UserInterface:
             device=self.device,
             model_name=settings.model_name,
             temperature=settings.temperature,
-            verbose=False, # Hardcoded for now
+            verbose=False,  # Hardcoded for now
             timeout=settings.api_timeout,
             audit_logger=self.audit_logger,
         )
 
     def _run_interactive_session(self):
         """Run the interactive chat session with styled output."""
-        print("\n" + "=" * 60)
-        print("Ready! Type 'quit' to exit")
-        print("=" * 60 + "\n")
+        logger.info("\n" + "=" * 60)
+        logger.info("Ready! Type 'quit' to exit")
+        logger.info("=" * 60 + "\n")
 
         while True:
             # Check session limits
             if self.query_count >= self.max_queries_per_session:
-                print(
-                    f"\n⚠️  Session limit reached ({self.max_queries_per_session} queries)\n"
-                    f"   Please restart the application for a new session."
+                logger.warning(
+                    ConsoleColors.colorize(
+                        f"\nSession limit reached ({self.max_queries_per_session} queries)\n"
+                        f"   Please restart the application for a new session.",
+                        ConsoleColors.WARNING,
+                    )
                 )
                 break
 
             try:
                 # Colored prompt
-                question = input(f"\n{InterfaceColors.PROMPT}💬 Ask:{InterfaceColors.RESET} ").strip()
+                question = input(
+                    f"\n{ConsoleColors.PROMPT}💬 Ask:{ConsoleColors.RESET} "
+                ).strip()
             except (KeyboardInterrupt, EOFError):
-                print(f"\n\n{InterfaceColors.INFO}👋 Interrupted. Exiting...{InterfaceColors.RESET}")
+                logger.info(
+                    ConsoleColors.colorize(
+                        "\n\n👋 Interrupted. Exiting...", ConsoleColors.INFO
+                    )
+                )
                 break
 
             # Handle exit commands
@@ -187,7 +209,7 @@ class UserInterface:
                 self.validator.validate_query(question)
             except (QueryTooLongError, BlockedContentError) as e:
                 print_line_separator()
-                print(str(e))
+                logger.error(str(e))
                 print_line_separator()
                 continue
 
@@ -206,9 +228,14 @@ class UserInterface:
                 print(answer)
 
             except Exception as e:
-                print(f"❌ Error processing query: {e!s}")
+                logger.error(
+                    ConsoleColors.colorize(
+                        f"❌ Error processing query: {e!s}", ConsoleColors.ERROR
+                    )
+                )
                 if self.assistant and self.assistant.verbose:
                     import traceback
+
                     traceback.print_exc()
 
             print_line_separator()
@@ -243,21 +270,35 @@ class UserInterface:
             self._run_interactive_session()
 
         except ValueError as e:
-            self.audit_logger.log(SecurityEventType.ERROR, f"Configuration error: {e}", severity="error")
-            print(f"Error: {e}")
+            self.audit_logger.log(
+                SecurityEventType.ERROR, f"Configuration error: {e}", severity="error"
+            )
+            logger.error(ConsoleColors.colorize(f"Error: {e}", ConsoleColors.ERROR))
         except ConnectionError as e:
-            print(f"{e}")
+            logger.error(ConsoleColors.colorize(f"{e}", ConsoleColors.ERROR))
         except KeyboardInterrupt:
-            print("\n\n👋 Interrupted. Exiting...")
+            logger.info(
+                ConsoleColors.colorize(
+                    "\n\n👋 Interrupted. Exiting...", ConsoleColors.INFO
+                )
+            )
         except Exception as e:
-            self.audit_logger.log(SecurityEventType.ERROR, f"Unexpected error: {e}", severity="critical")
-            print(f"Error: {e}")
+            self.audit_logger.log(
+                SecurityEventType.ERROR, f"Unexpected error: {e}", severity="critical"
+            )
+            logger.error(ConsoleColors.colorize(f"Error: {e}", ConsoleColors.ERROR))
             if self.assistant and self.assistant.verbose:
                 import traceback
+
                 traceback.print_exc()
         finally:
             if self.device:
                 self.device.disconnect()
 
             self.audit_logger.close()
-            print(f"\n📝 Audit logs saved to: {self.audit_logger.log_dir}/audit_{self.audit_logger.session_id}.log")
+            logger.info(
+                ConsoleColors.colorize(
+                    f"\n📝 Audit logs saved to: {self.audit_logger.log_dir}/audit_{self.audit_logger.session_id}.log",
+                    ConsoleColors.INFO,
+                )
+            )

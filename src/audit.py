@@ -1,17 +1,17 @@
 """Audit logging and security event tracking."""
 
 import logging
-import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Optional
 
 from .sensitive_data import SensitiveDataProtector
 
 
 class SecurityEventType(Enum):
     """Simplified security event types for audit logging."""
+
     SESSION_START = "SESSION_START"
     SESSION_END = "SESSION_END"
     CONNECTION = "CONNECTION"
@@ -47,7 +47,9 @@ class AuditLogger:
         self.logger.setLevel(getattr(logging, log_level.upper(), "INFO"))
         self.logger.handlers.clear()
 
-        formatter = logging.Formatter('%(asctime)s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = logging.Formatter(
+            "%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
 
         if enable_console:
             console_handler = logging.StreamHandler()
@@ -110,7 +112,13 @@ class AuditLogger:
             severity="warning",
         )
 
-    def log_command_executed(self, command: str, success: bool, output_length: int = 0, error: str = None):
+    def log_command_executed(
+        self,
+        command: str,
+        success: bool,
+        output_length: int = 0,
+        error: Optional[str] = None,
+    ):
         """Log command execution."""
         safe_command = self.data_protector.sanitize_command(command)
         if success:
@@ -119,14 +127,22 @@ class AuditLogger:
                 f"SUCCESS: '{safe_command}' | Output length: {output_length}",
             )
         else:
-            safe_error = self.data_protector.sanitize_error(error) if error else "Unknown error"
+            safe_error = (
+                self.data_protector.sanitize_error(error) if error else "Unknown error"
+            )
             self.log(
                 SecurityEventType.COMMAND,
                 f"FAILURE: '{safe_command}' | Error: {safe_error}",
                 severity="error",
             )
 
-    def log_event(self, event_type: SecurityEventType, message: str, severity: str = "info", **kwargs):
+    def log_event(
+        self,
+        event_type: SecurityEventType,
+        message: str,
+        severity: str = "info",
+        **kwargs,
+    ):
         """Generic event logger for other events."""
         self.log(event_type, message, severity)
 

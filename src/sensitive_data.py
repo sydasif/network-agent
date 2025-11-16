@@ -1,7 +1,7 @@
 """Sensitive data protection and sanitization."""
 
 import re
-from typing import Any
+from typing import ClassVar, List
 
 
 class SensitiveDataProtector:
@@ -9,13 +9,13 @@ class SensitiveDataProtector:
 
     # Define patterns for sensitive data detection
     # Order matters: more specific patterns should come first to avoid conflicts
-    SECRET_PATTERNS = [
+    SECRET_PATTERNS: ClassVar[List[str]] = [
         r'password\s*[:=]?\s*["\']?([^"\'\s]{4,})["\']?',  # Handles "password: value", "password=value", "password value"
-        r'secret\s*[:=]?\s*["\']?([^"\'\s]{4,})["\']?',   # Handles "secret: value", "secret=value", "secret value"
-        r'key\s*[:=]?\s*["\']?([^"\'\s]{4,})["\']?',      # Handles "key: value", "key=value", "key value"
+        r'secret\s*[:=]?\s*["\']?([^"\'\s]{4,})["\']?',  # Handles "secret: value", "secret=value", "secret value"
+        r'key\s*[:=]?\s*["\']?([^"\'\s]{4,})["\']?',  # Handles "key: value", "key=value", "key value"
     ]
 
-    API_KEY_PATTERN = r'gsk_[a-zA-Z0-9]{32,}'  # Groq API key pattern
+    API_KEY_PATTERN: ClassVar[str] = r"gsk_[a-zA-Z0-9]{32,}"  # Groq API key pattern
 
     @staticmethod
     def sanitize_for_logging(text: str) -> str:
@@ -34,13 +34,15 @@ class SensitiveDataProtector:
         all_matches = []
 
         # Find API key matches
-        for match in re.finditer(SensitiveDataProtector.API_KEY_PATTERN, text, flags=re.IGNORECASE):
-            all_matches.append((match.start(), match.end(), '[API_KEY_REDACTED]'))
+        for match in re.finditer(
+            SensitiveDataProtector.API_KEY_PATTERN, text, flags=re.IGNORECASE
+        ):
+            all_matches.append((match.start(), match.end(), "[API_KEY_REDACTED]"))
 
         # Find secret matches
         for pattern in SensitiveDataProtector.SECRET_PATTERNS:
             for match in re.finditer(pattern, text, flags=re.IGNORECASE):
-                all_matches.append((match.start(), match.end(), '[SECRET_REDACTED]'))
+                all_matches.append((match.start(), match.end(), "[SECRET_REDACTED]"))
 
         # Sort matches by start position in reverse order to avoid index shifting issues during replacement
         all_matches.sort(key=lambda x: x[0], reverse=True)
@@ -80,7 +82,10 @@ class SensitiveDataProtector:
 
         # Truncate if needed
         if max_length > 0 and len(sanitized) > max_length:
-            sanitized = sanitized[:max_length] + f"\n... [TRUNCATED: {len(output) - max_length} more chars]"
+            sanitized = (
+                sanitized[:max_length]
+                + f"\n... [TRUNCATED: {len(output) - max_length} more chars]"
+            )
 
         return sanitized
 

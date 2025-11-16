@@ -1,7 +1,7 @@
 """Integration tests for the network agent."""
 
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from src.agent import Agent
 from src.network_device import DeviceConnection
 from src.audit import AuditLogger
@@ -17,23 +17,25 @@ class TestAgentIntegration(unittest.TestCase):
         self.mock_device = Mock(spec=DeviceConnection)
         self.mock_audit_logger = Mock(spec=AuditLogger)
 
-    @patch('src.agent.CommandSecurityPolicy')
-    @patch('src.agent.ChatGroq')
+    @patch("src.agent.CommandSecurityPolicy")
+    @patch("src.agent.ChatGroq")
     def test_agent_with_valid_command(self, mock_chat_groq, mock_security_policy_class):
         """Test agent executing a valid command through full pipeline."""
         # Setup mocks
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
+        mock_security_policy.validate_command.return_value = (
+            None  # Valid command doesn't raise exception
+        )
         mock_security_policy_class.return_value = mock_security_policy
 
         # Create agent
         agent = Agent(
-            groq_api_key='test_key',
+            groq_api_key="test_key",
             device=self.mock_device,
-            model_name='test-model',
-            audit_logger=self.mock_audit_logger
+            model_name="test-model",
+            audit_logger=self.mock_audit_logger,
         )
 
         # Setup device response
@@ -50,23 +52,27 @@ class TestAgentIntegration(unittest.TestCase):
         )
         self.assertEqual(result, "Valid command output")
 
-    @patch('src.agent.CommandSecurityPolicy')
-    @patch('src.agent.ChatGroq')
-    def test_agent_with_blocked_command(self, mock_chat_groq, mock_security_policy_class):
+    @patch("src.agent.CommandSecurityPolicy")
+    @patch("src.agent.ChatGroq")
+    def test_agent_with_blocked_command(
+        self, mock_chat_groq, mock_security_policy_class
+    ):
         """Test agent blocking a command through security policy."""
         # Setup mocks
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.side_effect = CommandBlockedError("reload", "Blocked keyword 'reload'")
+        mock_security_policy.validate_command.side_effect = CommandBlockedError(
+            "reload", "Blocked keyword 'reload'"
+        )
         mock_security_policy_class.return_value = mock_security_policy
 
         # Create agent
         agent = Agent(
-            groq_api_key='test_key',
+            groq_api_key="test_key",
             device=self.mock_device,
-            model_name='test-model',
-            audit_logger=self.mock_audit_logger
+            model_name="test-model",
+            audit_logger=self.mock_audit_logger,
         )
 
         # Execute blocked command
@@ -80,27 +86,33 @@ class TestAgentIntegration(unittest.TestCase):
         )
         self.assertEqual(result, "⚠ BLOCKED: Blocked keyword 'reload'")
 
-    @patch('src.agent.CommandSecurityPolicy')
-    @patch('src.agent.ChatGroq')
-    def test_agent_with_connection_error(self, mock_chat_groq, mock_security_policy_class):
+    @patch("src.agent.CommandSecurityPolicy")
+    @patch("src.agent.ChatGroq")
+    def test_agent_with_connection_error(
+        self, mock_chat_groq, mock_security_policy_class
+    ):
         """Test agent handling connection errors."""
         # Setup mocks
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
+        mock_security_policy.validate_command.return_value = (
+            None  # Valid command doesn't raise exception
+        )
         mock_security_policy_class.return_value = mock_security_policy
 
         # Create agent
         agent = Agent(
-            groq_api_key='test_key',
+            groq_api_key="test_key",
             device=self.mock_device,
-            model_name='test-model',
-            audit_logger=self.mock_audit_logger
+            model_name="test-model",
+            audit_logger=self.mock_audit_logger,
         )
 
         # Setup device to raise connection error
-        self.mock_device.execute_command.side_effect = ConnectionError("Connection failed")
+        self.mock_device.execute_command.side_effect = ConnectionError(
+            "Connection failed"
+        )
 
         # Execute command that will fail
         result = agent._execute_device_command("show version")
@@ -120,7 +132,6 @@ class TestSecurityIntegration(unittest.TestCase):
     def test_command_security_policy_with_settings(self):
         """Test that security policy uses settings properly."""
         from src.security import CommandSecurityPolicy
-        from src.settings import settings
         from src.exceptions import CommandBlockedError
 
         policy = CommandSecurityPolicy()

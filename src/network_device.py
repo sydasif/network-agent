@@ -1,8 +1,14 @@
 """Device connection and command execution."""
 
+import logging
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
 from .settings import settings
+from .models import ConnectionStatus
+from datetime import datetime
+from typing import Optional
+
+logger = logging.getLogger("net_agent.network_device")
 
 
 class DeviceConnection:
@@ -12,6 +18,7 @@ class DeviceConnection:
         """Initialize device connection handler."""
         self.connection = None
         self.device_config = None
+        self.connected_at: Optional[datetime] = None
 
     def connect(self, hostname: str, username: str, password: str):
         """Connect to a network device with single attempt, fail fast.
@@ -39,7 +46,8 @@ class DeviceConnection:
 
         try:
             self.connection = ConnectHandler(**self.device_config)
-            print(f"✓ Connected to {hostname}")
+            self.connected_at = datetime.now()
+            logger.info(f"Connected to {hostname}")
         except NetmikoAuthenticationException as e:
             raise ConnectionError(
                 f"\n❌ SSH Authentication Failed for {hostname}\n"
@@ -75,11 +83,12 @@ class DeviceConnection:
         if self.connection:
             try:
                 self.connection.disconnect()
-                print("✓ Disconnected")
+                logger.info("Disconnected from device")
             except Exception as e:
-                print(f"⚠️  Disconnect error (non-critical): {e!s}")
+                logger.warning(f"Disconnect error (non-critical): {e!s}")
             finally:
                 self.connection = None
+                self.connected_at = None
 
     def execute_command(self, command: str) -> str:
         """Execute a command on the device - simplified version without retry.
@@ -109,12 +118,11 @@ class DeviceConnection:
 
         # Execute command with proper error handling - no retry logic
         try:
-            output = self.connection.send_command(
+            return self.connection.send_command(
                 command,
                 read_timeout=settings.command_timeout,
                 expect_string=r"#",
             )
-            return output
 
         except NetmikoTimeoutException as e:
             # CRITICAL: Check if it's a pattern detection issue vs real timeout
@@ -127,29 +135,27 @@ class DeviceConnection:
                     f"   Try: Use simpler commands or increase timeout\n"
                     f"   Error: {e!s}"
                 ) from e
-            else:
-                raise ConnectionError(
-                    f"❌ Command execution timeout\n"
-                    f"   Command: {command}\n"
-                    f"   Device may not respond"
-                ) from e
+            raise ConnectionError(
+                f"❌ Command execution timeout\n"
+                f"   Command: {command}\n"
+                f"   Device may not respond"
+            ) from e
 
         except Exception as e:
             raise ConnectionError(
-                f"❌ Command execution failed\n"
-                f"   Command: {command}\n"
-                f"   Error: {e!s}"
+                f"❌ Command execution failed\n   Command: {command}\n   Error: {e!s}"
             ) from e
 
-    def get_connection_status(self) -> dict:
+    def get_connection_status(self) -> ConnectionStatus:
         """Get current connection status information.
 
         Returns:
-            Dictionary with connection status details
+            ConnectionStatus object with connection details
         """
         connected = self.connection is not None
         device_hostname = self.device_config.get("host") if self.device_config else None
-        return {
-            "connected": connected,
-            "device": device_hostname,
-        }
+        return ConnectionStatus(
+            connected=connected,
+            device=device_hostname,
+            established_at=self.connected_at,
+        )

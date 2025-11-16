@@ -2,7 +2,6 @@
 
 import unittest
 from src.security import CommandSecurityPolicy
-from src.settings import settings
 from src.exceptions import CommandBlockedError
 
 
