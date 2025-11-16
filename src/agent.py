@@ -13,9 +13,7 @@ from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 from .audit import AuditLogger
-from .device_manager import DeviceManager
 from .exceptions import CommandBlockedError
-from .inventory import InventoryManager
 from .logging_config import get_verbose_logger
 from .security import CommandSecurityPolicy
 from .sensitive_data import SensitiveDataProtector
@@ -27,6 +25,7 @@ verbose_logger = get_verbose_logger()
 
 class AgentState(TypedDict):
     """Type-safe agent state schema."""
+
     messages: Annotated[list[BaseMessage], add_messages]
 
 
@@ -59,6 +58,7 @@ class EnhancedAgent:
 
         if verbose is None:
             from .settings import settings
+
             self.verbose = settings.verbose
 
         if self.verbose:
@@ -66,26 +66,58 @@ class EnhancedAgent:
         else:
             verbose_logger.setLevel(logging.INFO)
 
-        from langchain_core.prompts import ChatPromptTemplate
-        from .prompts import SYSTEM_PROMPT, MULTI_DEVICE_CONTEXT
-
-        # Enhanced system prompt with device context
-        enhanced_prompt = SYSTEM_PROMPT + "\n\n" + MULTI_DEVICE_CONTEXT
+        # Import for ReAct agent
+        from langchain_core.prompts import PromptTemplate
+        from langchain.agents import create_react_agent
 
         self.execute_command_tool = tool("execute_show_command")(
             self._execute_device_command
         )
+
+        # Define tools list
         tools = [self.execute_command_tool]
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", enhanced_prompt),
-                ("human", "{input}"),
-                ("placeholder", "{agent_scratchpad}"),
-            ]
-        )
+        # Template for ReAct agent format
+        template = """You act as a network engineer assistant. You always run real device commands with `execute_show_command`.
 
-        agent_runnable = create_tool_calling_agent(self.llm, tools, prompt)
+Your replies stay short and clear. You focus on real output, highlight issues, and run extra commands when needed.
+You work with common tasks such as VLANs, interfaces, routing, logs, version checks, configs, and neighbor discovery.
+
+After executing all necessary commands, provide a clear summary of the results to answer the user's question.
+
+Do not end your response with 'need more steps' or similar phrases unless you actually need more information from the user.
+
+Format your responses in a structured way for network data:
+- Use bullet points for lists of items (interfaces, neighbors, etc.)
+- Use clear headings when appropriate (## OSPF Configuration, ## Interface Status, etc.)
+- Highlight important values with bold (e.g., **Process ID: 1**)
+- For tables of data, use markdown table format
+- Organize information by category (Configuration, Status, Issues, etc.)
+
+Answer the following questions as best you can. You have access to the following tools:
+
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
+
+        prompt = PromptTemplate.from_template(template)
+        agent_runnable = create_react_agent(
+            self.llm, tools, prompt
+        )
         self.agent = AgentExecutor(
             agent=agent_runnable,
             tools=tools,
@@ -95,7 +127,7 @@ class EnhancedAgent:
             return_intermediate_steps=self.verbose,
         )
 
-        logger.info("Enhanced agent initialized with multi-device support")
+        logger.info("Enhanced agent initialized with ReAct agent format")
 
     def _initialize_llm(
         self, model_name: str, temperature: float, timeout: int
@@ -122,12 +154,12 @@ class EnhancedAgent:
         """
         # Pattern to match device references
         patterns = [
-            r'\bon\s+([A-Z0-9_-]+)',  # "on SW1", "on RTR1"
-            r'\bfrom\s+([A-Z0-9_-]+)',  # "from SW1", "from RTR1"
-            r'\bat\s+([A-Z0-9_-]+)',  # "at SW1", "at RTR1"
-            r'\bfor\s+([A-Z0-9_-]+)',  # "for SW1", "for RTR1"
-            r'\bof\s+([A-Z0-9_-]+)',  # "of SW1", "of RTR1"
-            r'^([A-Z0-9_-]+)\s+',  # "SW1 show vlans" (device at start)
+            r"\bon\s+([A-Z0-9_-]+)",  # "on SW1", "on RTR1"
+            r"\bfrom\s+([A-Z0-9_-]+)",  # "from SW1", "from RTR1"
+            r"\bat\s+([A-Z0-9_-]+)",  # "at SW1", "at RTR1"
+            r"\bfor\s+([A-Z0-9_-]+)",  # "for SW1", "for RTR1"
+            r"\bof\s+([A-Z0-9_-]+)",  # "of SW1", "of RTR1"
+            r"^([A-Z0-9_-]+)\s+",  # "SW1 show vlans" (device at start)
         ]
 
         for pattern in patterns:
@@ -139,11 +171,11 @@ class EnhancedAgent:
                 if self.inventory_manager and device_name in self.inventory_manager:
                     # Remove the device reference from question
                     cleaned_question = re.sub(
-                        pattern, ' ', question, flags=re.IGNORECASE
+                        pattern, " ", question, flags=re.IGNORECASE
                     ).strip()
 
                     # Clean up extra spaces
-                    cleaned_question = ' '.join(cleaned_question.split())
+                    cleaned_question = " ".join(cleaned_question.split())
 
                     verbose_logger.debug(
                         f"Extracted device: {device_name}, "
@@ -183,7 +215,9 @@ class EnhancedAgent:
 
         # Device not connected, connect to it
         try:
-            verbose_logger.info(f"Connecting to '{device_name}' ({device_info.hostname})...")
+            verbose_logger.info(
+                f"Connecting to '{device_name}' ({device_info.hostname})..."
+            )
             success = self.device_manager.connect_to_device(device_name, device_info)
             if success:
                 verbose_logger.info(f"✓ Connected to {device_name}")

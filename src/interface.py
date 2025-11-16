@@ -1,6 +1,5 @@
 """User interface for network automation agent with multi-device support."""
 
-import getpass
 import logging
 import os
 import re
@@ -184,24 +183,28 @@ devices:
     role: distribution
 """
 
-        with open(self.inventory_file, 'w') as f:
+        with open(self.inventory_file, "w") as f:
             f.write(sample_content)
 
-        print(ConsoleColors.colorize(
-            f"📦 Created sample inventory file: {self.inventory_file}\n"
-            f"💡 Edit this file to add your network devices.\n",
-            ConsoleColors.INFO
-        ))
+        print(
+            ConsoleColors.colorize(
+                f"📦 Created sample inventory file: {self.inventory_file}\n"
+                f"💡 Edit this file to add your network devices.\n",
+                ConsoleColors.INFO,
+            )
+        )
 
     def _setup_with_inventory(self):
         """Initialize the system with inventory."""
         # Load inventory
         inventory_path = Path(self.inventory_file)
         if not inventory_path.exists():
-            print(ConsoleColors.colorize(
-                f"⚠️  Inventory file not found: {self.inventory_file}",
-                ConsoleColors.WARNING
-            ))
+            print(
+                ConsoleColors.colorize(
+                    f"⚠️  Inventory file not found: {self.inventory_file}",
+                    ConsoleColors.WARNING,
+                )
+            )
             # Create sample inventory
             self._create_sample_inventory()
 
@@ -219,10 +222,12 @@ devices:
             audit_logger=self.audit_logger,
         )
 
-        print(ConsoleColors.colorize(
-            f"📦 Inventory: {len(self.inventory_manager)} devices loaded",
-            ConsoleColors.SUCCESS
-        ))
+        print(
+            ConsoleColors.colorize(
+                f"📦 Inventory: {len(self.inventory_manager)} devices loaded",
+                ConsoleColors.SUCCESS,
+            )
+        )
 
     def _handle_special_commands(self, question: str) -> bool:
         """Handle special commands like 'inventory', 'connected', etc.
@@ -239,21 +244,23 @@ devices:
             self._show_inventory()
             return True
 
-        elif command == "connected":
+        if command == "connected":
             self._show_connected_devices()
             return True
 
-        elif command.startswith("switch "):
+        if command.startswith("switch "):
             device_name = command[7:].strip().upper()  # Get device name after "switch "
             self._switch_device(device_name)
             return True
 
-        elif command.startswith("disconnect "):
-            device_name = command[11:].strip().upper()  # Get device name after "disconnect "
+        if command.startswith("disconnect "):
+            device_name = (
+                command[11:].strip().upper()
+            )  # Get device name after "disconnect "
             self._disconnect_device(device_name)
             return True
 
-        elif command in ["help", "h"]:
+        if command in ["help", "h"]:
             self._show_help()
             return True
 
@@ -266,13 +273,7 @@ devices:
         print()
 
         # Group devices by role
-        roles = {
-            "core": [],
-            "distribution": [],
-            "access": [],
-            "edge": [],
-            "other": []
-        }
+        roles = {"core": [], "distribution": [], "access": [], "edge": [], "other": []}
 
         for device in self.inventory_manager.list_devices():
             role = device.role.lower() if device.role else "other"
@@ -287,8 +288,12 @@ devices:
             if roles[role]:
                 print(f"  {role.upper()}:")
                 for device in sorted(roles[role], key=lambda d: d.name):
-                    status = "✓" if self.device_manager.is_connected(device.name) else "○"
-                    print(f"    {status} {device.name:<15} {device.hostname:<15} {device.description or ''}")
+                    status = (
+                        "✓" if self.device_manager.is_connected(device.name) else "○"
+                    )
+                    print(
+                        f"    {status} {device.name:<15} {device.hostname:<15} {device.description or ''}"
+                    )
                 print()
 
         if not any(roles.values()):
@@ -308,7 +313,9 @@ devices:
             for device_name, connection in connected_devices.items():
                 status = "✓"
                 marker = "  →" if device_name == current_device else "   "
-                print(f"{marker} {status} {device_name:<15} {connection.device_config['host']}")
+                print(
+                    f"{marker} {status} {device_name:<15} {connection.device_config['host']}"
+                )
         else:
             print("  No devices currently connected.")
         print_line_separator()
@@ -318,7 +325,9 @@ devices:
         print_line_separator()
         if device_name not in self.inventory_manager:
             print(f"❌ Device '{device_name}' not found in inventory")
-            print(f"💡 Available devices: {', '.join(self.inventory_manager.get_device_names())}")
+            print(
+                f"💡 Available devices: {', '.join(self.inventory_manager.get_device_names())}"
+            )
         elif not self.device_manager.is_connected(device_name):
             print(f"❌ Device '{device_name}' is not connected")
         else:
@@ -365,7 +374,7 @@ devices:
 
     def _run_interactive_session(self):
         """Run the interactive chat session with styled output."""
-        print(f"\n💡 Tip: Ask naturally like 'show vlans on SW1' or 'check RTR1 uptime'")
+        print("\n💡 Tip: Ask naturally like 'show vlans on SW1' or 'check RTR1 uptime'")
         print("=" * 60)
         print("Ready! Ask questions about any device in your inventory")
         print("Type 'help' for commands or ask naturally")
@@ -386,7 +395,7 @@ devices:
             # Get current device for prompt
             current_device = self.device_manager.get_current_device_name()
             prompt_prefix = f"[{current_device}]" if current_device else ""
-            
+
             try:
                 # Colored prompt
                 question = input(

@@ -1,7 +1,6 @@
 """Multi-device connection management."""
 
 import logging
-from datetime import datetime
 from typing import Dict, Optional
 
 from .inventory import InventoryDevice
@@ -41,16 +40,16 @@ class DeviceManager:
             connection.connect(
                 hostname=device_info.hostname,
                 username=device_info.username,
-                password=device_info.password
+                password=device_info.password,
             )
-            
+
             # Store the connection
             self.connections[device_name] = connection
             self.current_device_name = device_name
-            
+
             logger.info(f"Connected to device: {device_name}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to {device_name}: {e}")
             return False
@@ -71,7 +70,7 @@ class DeviceManager:
         try:
             connection.disconnect()
             del self.connections[device_name]
-            
+
             # If we disconnected the current device, reset current device
             if self.current_device_name == device_name:
                 if self.connections:
@@ -79,10 +78,10 @@ class DeviceManager:
                     self.current_device_name = next(iter(self.connections))
                 else:
                     self.current_device_name = None
-            
+
             logger.info(f"Disconnected from device: {device_name}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error disconnecting from {device_name}: {e}")
             return False
@@ -98,7 +97,7 @@ class DeviceManager:
         """
         if device_name not in self.connections:
             raise ValueError(f"Device {device_name} not connected")
-        
+
         self.current_device_name = device_name
         logger.info(f"Switched to device: {device_name}")
         return True

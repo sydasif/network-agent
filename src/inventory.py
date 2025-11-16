@@ -16,6 +16,7 @@ logger = logging.getLogger("net_agent.inventory")
 @dataclass
 class InventoryDevice:
     """Device information from inventory."""
+
     name: str
     hostname: str
     username: str
@@ -61,10 +62,10 @@ class InventoryManager:
             raise NetworkAgentError(f"Inventory file not found: {file_path}")
 
         try:
-            with open(path, 'r') as f:
-                if path.suffix in ['.yaml', '.yml']:
+            with open(path, "r") as f:
+                if path.suffix in [".yaml", ".yml"]:
                     data = yaml.safe_load(f)
-                elif path.suffix == '.json':
+                elif path.suffix == ".json":
                     data = json.load(f)
                 else:
                     raise NetworkAgentError(
@@ -96,16 +97,16 @@ class InventoryManager:
             ]
         }
         """
-        if 'devices' not in data:
+        if "devices" not in data:
             raise NetworkAgentError(
                 "Invalid inventory format. Expected 'devices' key at root level."
             )
 
-        devices_list = data['devices']
+        devices_list = data["devices"]
 
         for device_data in devices_list:
             # Validate required fields
-            required = ['name', 'hostname', 'username', 'password']
+            required = ["name", "hostname", "username", "password"]
             missing = [f for f in required if f not in device_data]
 
             if missing:
@@ -115,15 +116,15 @@ class InventoryManager:
                 continue
 
             device = InventoryDevice(
-                name=device_data['name'],
-                hostname=device_data['hostname'],
-                username=device_data['username'],
-                password=device_data['password'],
-                device_type=device_data.get('device_type', 'cisco_ios'),
-                port=device_data.get('port', 22),
-                description=device_data.get('description'),
-                location=device_data.get('location'),
-                role=device_data.get('role'),
+                name=device_data["name"],
+                hostname=device_data["hostname"],
+                username=device_data["username"],
+                password=device_data["password"],
+                device_type=device_data.get("device_type", "cisco_ios"),
+                port=device_data.get("port", 22),
+                description=device_data.get("description"),
+                location=device_data.get("location"),
+                role=device_data.get("role"),
             )
 
             self.devices[device.name] = device
@@ -178,10 +179,12 @@ class InventoryManager:
         results = []
 
         for device in self.devices.values():
-            if (query_lower in device.name.lower() or
-                query_lower in device.hostname.lower() or
-                (device.description and query_lower in device.description.lower()) or
-                (device.location and query_lower in device.location.lower())):
+            if (
+                query_lower in device.name.lower()
+                or query_lower in device.hostname.lower()
+                or (device.description and query_lower in device.description.lower())
+                or (device.location and query_lower in device.location.lower())
+            ):
                 results.append(device)
 
         return results
@@ -202,14 +205,12 @@ class InventoryManager:
         """
         path = Path(file_path)
 
-        data = {
-            'devices': [device.to_dict() for device in self.devices.values()]
-        }
+        data = {"devices": [device.to_dict() for device in self.devices.values()]}
 
-        with open(path, 'w') as f:
-            if path.suffix in ['.yaml', '.yml']:
+        with open(path, "w") as f:
+            if path.suffix in [".yaml", ".yml"]:
                 yaml.dump(data, f, default_flow_style=False)
-            elif path.suffix == '.json':
+            elif path.suffix == ".json":
                 json.dump(data, f, indent=2)
             else:
                 raise NetworkAgentError(
