@@ -6,6 +6,7 @@ from src.agent import Agent, AgentState
 from src.network_device import DeviceConnection
 from src.audit import AuditLogger
 from src.security import CommandSecurityPolicy
+from src.exceptions import CommandBlockedError
 
 
 class TestAgent(unittest.TestCase):
@@ -16,7 +17,7 @@ class TestAgent(unittest.TestCase):
         self.mock_device = Mock(spec=DeviceConnection)
         self.mock_audit_logger = Mock(spec=AuditLogger)
         self.mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        
+
         # Patch the CommandSecurityPolicy to return our mock
         with patch('src.agent.CommandSecurityPolicy', return_value=self.mock_security_policy):
             self.agent = Agent(
@@ -34,14 +35,14 @@ class TestAgent(unittest.TestCase):
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         agent = Agent(
             groq_api_key='test_key',
             device=self.mock_device,
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         self.assertEqual(agent.model_name, 'test-model')
         self.assertEqual(agent.groq_api_key, 'test_key')
         self.assertIsNotNone(agent.data_protector)
@@ -56,20 +57,20 @@ class TestAgent(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         agent = Agent(
             groq_api_key='test_key',
             device=self.mock_device,
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Execute command
         self.mock_device.execute_command.return_value = "Command output"
         result = agent._execute_device_command("show version")
-        
+
         # Assertions
         mock_security_policy.validate_command.assert_called_once_with("show version")
         self.mock_device.execute_command.assert_called_once_with("show version")
@@ -86,19 +87,19 @@ class TestAgent(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (False, "Blocked keyword 'reload'")
+        mock_security_policy.validate_command.side_effect = CommandBlockedError("reload", "Blocked keyword 'reload'")
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         agent = Agent(
             groq_api_key='test_key',
             device=self.mock_device,
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Execute command
         result = agent._execute_device_command("reload")
-        
+
         # Assertions
         mock_security_policy.validate_command.assert_called_once_with("reload")
         self.mock_device.execute_command.assert_not_called()
@@ -115,22 +116,22 @@ class TestAgent(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         agent = Agent(
             groq_api_key='test_key',
             device=self.mock_device,
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Setup connection error
         self.mock_device.execute_command.side_effect = ConnectionError("Connection failed")
-        
+
         # Execute command
         result = agent._execute_device_command("show version")
-        
+
         # Assertions
         mock_security_policy.validate_command.assert_called_once_with("show version")
         self.mock_device.execute_command.assert_called_once_with("show version")
@@ -147,22 +148,22 @@ class TestAgent(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         agent = Agent(
             groq_api_key='test_key',
             device=self.mock_device,
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Setup general error
         self.mock_device.execute_command.side_effect = Exception("General error")
-        
+
         # Execute command
         result = agent._execute_device_command("show version")
-        
+
         # Assertions
         mock_security_policy.validate_command.assert_called_once_with("show version")
         self.mock_device.execute_command.assert_called_once_with("show version")

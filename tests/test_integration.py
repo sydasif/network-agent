@@ -6,6 +6,7 @@ from src.agent import Agent
 from src.network_device import DeviceConnection
 from src.audit import AuditLogger
 from src.security import CommandSecurityPolicy
+from src.exceptions import CommandBlockedError
 
 
 class TestAgentIntegration(unittest.TestCase):
@@ -24,9 +25,9 @@ class TestAgentIntegration(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         # Create agent
         agent = Agent(
             groq_api_key='test_key',
@@ -34,13 +35,13 @@ class TestAgentIntegration(unittest.TestCase):
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Setup device response
         self.mock_device.execute_command.return_value = "Valid command output"
-        
+
         # Execute command
         result = agent._execute_device_command("show version")
-        
+
         # Verify all components were called correctly
         mock_security_policy.validate_command.assert_called_once_with("show version")
         self.mock_device.execute_command.assert_called_once_with("show version")
@@ -57,9 +58,9 @@ class TestAgentIntegration(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (False, "Blocked keyword 'reload'")
+        mock_security_policy.validate_command.side_effect = CommandBlockedError("reload", "Blocked keyword 'reload'")
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         # Create agent
         agent = Agent(
             groq_api_key='test_key',
@@ -67,10 +68,10 @@ class TestAgentIntegration(unittest.TestCase):
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Execute blocked command
         result = agent._execute_device_command("reload")
-        
+
         # Verify command was blocked and not executed on device
         mock_security_policy.validate_command.assert_called_once_with("reload")
         self.mock_device.execute_command.assert_not_called()
@@ -87,9 +88,9 @@ class TestAgentIntegration(unittest.TestCase):
         mock_llm = Mock()
         mock_chat_groq.return_value = mock_llm
         mock_security_policy = Mock(spec=CommandSecurityPolicy)
-        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy.validate_command.return_value = None  # Valid command doesn't raise exception
         mock_security_policy_class.return_value = mock_security_policy
-        
+
         # Create agent
         agent = Agent(
             groq_api_key='test_key',
@@ -97,13 +98,13 @@ class TestAgentIntegration(unittest.TestCase):
             model_name='test-model',
             audit_logger=self.mock_audit_logger
         )
-        
+
         # Setup device to raise connection error
         self.mock_device.execute_command.side_effect = ConnectionError("Connection failed")
-        
+
         # Execute command that will fail
         result = agent._execute_device_command("show version")
-        
+
         # Verify error was handled properly
         mock_security_policy.validate_command.assert_called_once_with("show version")
         self.mock_device.execute_command.assert_called_once_with("show version")
@@ -120,23 +121,27 @@ class TestSecurityIntegration(unittest.TestCase):
         """Test that security policy uses settings properly."""
         from src.security import CommandSecurityPolicy
         from src.settings import settings
-        
+        from src.exceptions import CommandBlockedError
+
         policy = CommandSecurityPolicy()
-        
+
         # Test blocked keyword from settings
-        is_valid, reason = policy.validate_command(f"reload")
-        self.assertFalse(is_valid)
-        self.assertIn("reload", reason)
-        
+        with self.assertRaises(CommandBlockedError) as context:
+            policy.validate_command("reload")
+        self.assertIn("reload", str(context.exception))
+
         # Test allowed command from settings
-        is_valid, reason = policy.validate_command(f"show version")
-        self.assertTrue(is_valid)
-        self.assertEqual(reason, "")
-        
+        # Should not raise any exception
+        try:
+            policy.validate_command("show version")
+            self.assertTrue(True)  # No exception raised
+        except Exception:
+            self.fail("validate_command raised an exception unexpectedly!")
+
         # Test blocked keyword that should be in settings
-        is_valid, reason = policy.validate_command(f"configure terminal")
-        self.assertFalse(is_valid)
-        self.assertIn("configure", reason)
+        with self.assertRaises(CommandBlockedError) as context:
+            policy.validate_command("configure terminal")
+        self.assertIn("configure", str(context.exception))
 
 
 if __name__ == "__main__":

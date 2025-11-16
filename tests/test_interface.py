@@ -6,6 +6,7 @@ from io import StringIO
 import sys
 from src.interface import UserInterface, InputValidator
 from src.audit import AuditLogger, SecurityEventType
+from src.exceptions import QueryTooLongError, BlockedContentError
 
 
 class TestInputValidator(unittest.TestCase):
@@ -18,33 +19,31 @@ class TestInputValidator(unittest.TestCase):
 
     def test_validate_query_empty(self):
         """Test validating an empty query."""
-        is_valid, error_message = self.validator.validate_query("")
-        self.assertFalse(is_valid)
-        self.assertEqual(error_message, "Empty query")
+        with self.assertRaises(BlockedContentError):
+            self.validator.validate_query("")
 
-        is_valid, error_message = self.validator.validate_query("   ")
-        self.assertFalse(is_valid)
-        self.assertEqual(error_message, "Empty query")
+        with self.assertRaises(BlockedContentError):
+            self.validator.validate_query("   ")
 
     def test_validate_query_length_ok(self):
         """Test validating a query that is within length limits."""
-        is_valid, error_message = self.validator.validate_query("This is a short query")
-        self.assertTrue(is_valid)
-        self.assertEqual(error_message, "")
+        # Should not raise any exception
+        try:
+            self.validator.validate_query("This is a short query")
+            self.assertTrue(True)  # No exception raised
+        except Exception:
+            self.fail("validate_query raised an exception unexpectedly!")
 
     def test_validate_query_too_long(self):
         """Test validating a query that exceeds length limits."""
         long_query = "a" * 600
-        is_valid, error_message = self.validator.validate_query(long_query)
-        self.assertFalse(is_valid)
-        self.assertIn("Query too long", error_message)
+        with self.assertRaises(QueryTooLongError):
+            self.validator.validate_query(long_query)
 
     def test_validate_query_blocked_content(self):
         """Test validating a query with blocked content."""
-        is_valid, error_message = self.validator.validate_query("reload system")
-        self.assertFalse(is_valid)
-        self.assertIn("Query contains blocked content", error_message)
-        self.assertIn("reload", error_message)
+        with self.assertRaises(BlockedContentError):
+            self.validator.validate_query("reload system")
 
     def test_sanitize_query(self):
         """Test query sanitization."""

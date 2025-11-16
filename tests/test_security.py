@@ -3,6 +3,7 @@
 import unittest
 from src.security import CommandSecurityPolicy
 from src.settings import settings
+from src.exceptions import CommandBlockedError
 
 
 class TestCommandSecurityPolicy(unittest.TestCase):
@@ -14,45 +15,46 @@ class TestCommandSecurityPolicy(unittest.TestCase):
 
     def test_validate_command_valid(self):
         """Test that a valid command passes validation."""
-        is_valid, reason = self.policy.validate_command("show version")
-        self.assertTrue(is_valid)
-        self.assertEqual(reason, "")
+        # Should not raise any exception
+        try:
+            self.policy.validate_command("show version")
+            self.assertTrue(True)  # No exception raised
+        except Exception:
+            self.fail("validate_command raised an exception unexpectedly!")
 
     def test_validate_command_empty(self):
         """Test that an empty command fails validation."""
-        is_valid, reason = self.policy.validate_command("")
-        self.assertFalse(is_valid)
-        self.assertEqual(reason, "Empty command")
+        with self.assertRaises(CommandBlockedError):
+            self.policy.validate_command("")
 
     def test_validate_command_blocked_keyword(self):
         """Test that a command with a blocked keyword fails validation."""
-        is_valid, reason = self.policy.validate_command("reload")
-        self.assertFalse(is_valid)
-        self.assertEqual(reason, "Blocked keyword 'reload'")
+        with self.assertRaises(CommandBlockedError):
+            self.policy.validate_command("reload")
 
     def test_validate_command_not_allowed_prefix(self):
         """Test that a command with a not allowed prefix fails validation."""
-        is_valid, reason = self.policy.validate_command("configure terminal")
-        self.assertFalse(is_valid)
-        self.assertEqual(reason, "Blocked keyword 'configure'")
+        with self.assertRaises(CommandBlockedError):
+            self.policy.validate_command("configure terminal")
 
     def test_validate_command_chaining_semicolon(self):
         """Test that a command with semicolon chaining fails validation."""
-        is_valid, reason = self.policy.validate_command("show version; show ip interface brief")
-        self.assertFalse(is_valid)
-        self.assertEqual(reason, "Semicolon command chaining is not allowed")
+        with self.assertRaises(CommandBlockedError):
+            self.policy.validate_command("show version; show ip interface brief")
 
     def test_validate_command_chaining_pipe(self):
         """Test that a command with an unsupported pipe command fails validation."""
-        is_valid, reason = self.policy.validate_command("show version | grep test")
-        self.assertFalse(is_valid)
-        self.assertEqual(reason, "Unsupported pipe command")
+        with self.assertRaises(CommandBlockedError):
+            self.policy.validate_command("show version | grep test")
 
     def test_validate_command_chaining_allowed_pipe(self):
         """Test that a command with a supported pipe command passes validation."""
-        is_valid, reason = self.policy.validate_command("show version | include V")
-        self.assertTrue(is_valid)
-        self.assertEqual(reason, "")
+        # Should not raise any exception
+        try:
+            self.policy.validate_command("show version | include V")
+            self.assertTrue(True)  # No exception raised
+        except Exception:
+            self.fail("validate_command raised an exception unexpectedly!")
 
 
 if __name__ == "__main__":

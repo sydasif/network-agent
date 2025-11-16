@@ -123,10 +123,10 @@ policy = CommandSecurityPolicy()
 
 #### Methods
 
-**`validate_command(command: str) -> tuple[bool, str]`**
+**`validate_command(command: str) -> None`**
 
 - Validates a command against security policies
-- Returns `(is_valid, reason)` tuple
+- Raises `CommandBlockedError` on validation failure
 - Checks against blocked keywords and allowed prefixes
 - Validates against command chaining patterns
 
@@ -301,10 +301,12 @@ validator = InputValidator(audit_logger=None, max_query_length: int = 500)
 
 #### Methods
 
-**`validate_query(query: str) -> tuple[bool, str]`**
+**`validate_query(query: str) -> None`**
 
 - Validate user query against security constraints
-- Returns `(is_valid, error_message)`
+- Raises exceptions on validation failure:
+  - `QueryTooLongError` if query exceeds maximum length
+  - `BlockedContentError` if query contains blocked content
 
 **`sanitize_query(query: str) -> str`**
 

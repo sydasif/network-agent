@@ -5,6 +5,7 @@ import time
 import getpass
 from .agent import Agent
 from .audit import AuditLogger, SecurityEventType
+from .exceptions import QueryTooLongError, BlockedContentError
 from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
 from .settings import settings
@@ -34,20 +35,19 @@ class InputValidator:
         self.audit_logger = audit_logger
         self.max_query_length = max_query_length
 
-    def validate_query(self, query: str) -> tuple[bool, str]:
+    def validate_query(self, query: str) -> None:
         """Validate user query for security concerns.
 
         Args:
             query: User input query
 
-        Returns:
-            Tuple of (is_valid, error_message)
-            If valid: (True, "")
-            If invalid: (False, "error message")
+        Raises:
+            QueryTooLongError: If query exceeds maximum length
+            BlockedContentError: If query contains blocked patterns
         """
         # Check if query is empty
         if not query or not query.strip():
-            return False, "Empty query"
+            raise BlockedContentError(query, "Empty query")
 
         # Check length limits (now configurable)
         if len(query) > self.max_query_length:
@@ -61,7 +61,7 @@ class InputValidator:
             if self.audit_logger:
                 self.audit_logger.log(SecurityEventType.ERROR, f"Validation failed: Length exceeded. Query: {query[:200]}", severity="warning")
 
-            return False, error_message
+            raise QueryTooLongError(len(query), self.max_query_length)
 
         # Check for blocked patterns (immediate rejection)
         query_lower = query.lower()
@@ -77,9 +77,7 @@ class InputValidator:
                 if self.audit_logger:
                     self.audit_logger.log(SecurityEventType.ERROR, f"Validation failed: Blocked pattern: {pattern}. Query: {query[:200]}", severity="critical")
 
-                return False, error_message
-
-        return True, ""
+                raise BlockedContentError(query, pattern)
 
     @staticmethod
     def sanitize_query(query: str) -> str:
@@ -185,10 +183,11 @@ class UserInterface:
                 continue
 
             # CRITICAL: Validate user input before processing
-            is_valid, error_message = self.validator.validate_query(question)
-            if not is_valid:
+            try:
+                self.validator.validate_query(question)
+            except (QueryTooLongError, BlockedContentError) as e:
                 print_line_separator()
-                print(error_message)
+                print(str(e))
                 print_line_separator()
                 continue
 

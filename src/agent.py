@@ -12,6 +12,7 @@ from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 from .audit import AuditLogger
+from .exceptions import CommandBlockedError
 from .network_device import DeviceConnection
 from .security import CommandSecurityPolicy
 from .sensitive_data import SensitiveDataProtector
@@ -116,11 +117,12 @@ class Agent:
 
     def _execute_device_command(self, command: str) -> str:
         """Execute a command after validation."""
-        is_valid, reason = self.security_policy.validate_command(command)
-        if not is_valid:
+        try:
+            self.security_policy.validate_command(command)
+        except CommandBlockedError as e:
             if self.audit_logger:
-                self.audit_logger.log_command_blocked(command, reason)
-            return f"⚠ BLOCKED: {reason}"
+                self.audit_logger.log_command_blocked(command, e.reason)
+            return f"⚠ BLOCKED: {e.reason}"
         return self._execute_validated_command(command)
 
     def _execute_validated_command(self, command: str) -> str:
