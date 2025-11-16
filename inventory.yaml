@@ -1,0 +1,22 @@
+# Network Device Inventory
+# Format: YAML (you can also use JSON)
+
+devices:
+  # Distribution Switches
+  - name: S1
+    hostname: 192.168.121.101
+    username: admin
+    password: admin
+    device_type: cisco_ios
+    description: Floor 1
+    location: Building-A-Floor1
+    role: distribution
+
+  - name: S2
+    hostname: 192.168.121.102
+    username: admin
+    password: admin
+    device_type: cisco_ios
+    description: Floor 2
+    location: Building-A-Floor2
+    role: distribution

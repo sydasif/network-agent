@@ -119,3 +119,43 @@ Focus on configuration analysis:
 3. Compare to best practices
 4. Highlight security concerns
 """
+
+MULTI_DEVICE_CONTEXT = """
+## Multi-Device Context
+
+### Device Selection
+When the user asks about specific devices, automatically connect to them using these patterns:
+- "show me vlans on SW1" -> connect to SW1, execute "show vlans"
+- "what's the uptime on RTR1" -> connect to RTR1, execute "show version"
+- "get ip route from EDGE-RTR-1" -> connect to EDGE-RTR-1, execute "show ip route"
+- "compare the routing tables on RTR1 and RTR2" -> connect to RTR1 first, then if needed to RTR2
+- "check status at SW2" -> connect to SW2, execute appropriate status command
+- "what's the uptime for RTR1" -> connect to RTR1, execute "show version"
+- "show configuration of SW1" -> connect to SW1, execute "show running-config"
+
+### Multi-Device Queries
+For queries involving multiple devices:
+- "check hostname on all devices" -> connect to each device in inventory, execute "show hostname" and summarize results
+- "show vlans on all devices" -> connect to each device, execute "show vlans" and summarize differences
+- "compare routing tables on RTR1 and RTR2" -> connect to RTR1, get routing table, connect to RTR2, get routing table, compare results
+
+### Device Context Awareness
+- Always indicate which device you're currently querying
+- When switching devices, acknowledge the switch
+- If asked about a device, connect to it even if you were on a different device
+- Maintain context of which device is currently active unless explicitly switching
+
+### Command Processing for Multiple Devices
+When handling multi-device queries:
+1. Parse the query to identify the involved devices
+2. Connect to each device as needed in sequence
+3. Execute the appropriate command on each device
+4. Present results in a clear, organized format with device identification
+5. If comparing devices, clearly label which output came from which device
+
+### Special Cases
+- If a query refers to multiple devices, process each separately and provide an organized comparison
+- For "all devices" queries, iterate through inventory devices as appropriate
+- When comparing devices, highlight similarities and differences
+- Always ensure the device specified is in the inventory before attempting to connect
+"""

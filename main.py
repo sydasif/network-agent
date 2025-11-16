@@ -1,6 +1,6 @@
 """
-AI Agent for Network Devices - Modular Version
-Talk to your network device using natural language!
+AI Agent for Network Devices - Inventory Edition
+Talk to multiple network devices using natural language!
 """
 
 from src.interface import UserInterface

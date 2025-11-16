@@ -1,7 +1,8 @@
-"""Agent setup and management for network automation."""
+"""Enhanced agent with device context understanding."""
 
 import logging
-from typing import Annotated
+import re
+from typing import Annotated, Optional, Tuple
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.messages import BaseMessage
@@ -12,9 +13,10 @@ from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 from .audit import AuditLogger
+from .device_manager import DeviceManager
 from .exceptions import CommandBlockedError
+from .inventory import InventoryManager
 from .logging_config import get_verbose_logger
-from .network_device import DeviceConnection
 from .security import CommandSecurityPolicy
 from .sensitive_data import SensitiveDataProtector
 
@@ -25,30 +27,26 @@ verbose_logger = get_verbose_logger()
 
 class AgentState(TypedDict):
     """Type-safe agent state schema."""
-
     messages: Annotated[list[BaseMessage], add_messages]
 
 
-class Agent:
-    """AI-powered agent for network automation."""
+class EnhancedAgent:
+    """AI-powered agent with device context understanding."""
 
     def __init__(
         self,
         groq_api_key: str,
-        device: DeviceConnection,
+        device_manager,  # DeviceManager instance
+        inventory_manager,  # InventoryManager instance
         model_name: str,
         temperature: float = 0.1,
-        verbose: bool | None = None,  # ✅ Allow None to use settings
+        verbose: bool | None = None,
         timeout: int = 60,
         audit_logger: AuditLogger | None = None,
     ) -> None:
-        """Initialize the agent."""
-        self.device = device
-        # Use settings.verbose as default if not explicitly provided
-        if verbose is None:
-            from .settings import settings
-
-            verbose = settings.verbose
+        """Initialize the enhanced agent."""
+        self.device_manager = device_manager
+        self.inventory_manager = inventory_manager
         self.verbose = verbose
         self.timeout = timeout
         self.groq_api_key = groq_api_key
@@ -59,14 +57,20 @@ class Agent:
         self.security_policy = CommandSecurityPolicy()
         self.llm = self._initialize_llm(model_name, temperature, timeout)
 
+        if verbose is None:
+            from .settings import settings
+            self.verbose = settings.verbose
+
         if self.verbose:
             verbose_logger.setLevel(logging.DEBUG)
         else:
             verbose_logger.setLevel(logging.INFO)
 
         from langchain_core.prompts import ChatPromptTemplate
+        from .prompts import SYSTEM_PROMPT, MULTI_DEVICE_CONTEXT
 
-        from .prompts import SYSTEM_PROMPT
+        # Enhanced system prompt with device context
+        enhanced_prompt = SYSTEM_PROMPT + "\n\n" + MULTI_DEVICE_CONTEXT
 
         self.execute_command_tool = tool("execute_show_command")(
             self._execute_device_command
@@ -75,7 +79,7 @@ class Agent:
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", SYSTEM_PROMPT),
+                ("system", enhanced_prompt),
                 ("human", "{input}"),
                 ("placeholder", "{agent_scratchpad}"),
             ]
@@ -91,7 +95,7 @@ class Agent:
             return_intermediate_steps=self.verbose,
         )
 
-        logger.info("Agent initialized with model: %s", model_name)
+        logger.info("Enhanced agent initialized with multi-device support")
 
     def _initialize_llm(
         self, model_name: str, temperature: float, timeout: int
@@ -104,21 +108,114 @@ class Agent:
             request_timeout=timeout,
         )
 
+    def _extract_device_reference(self, question: str) -> Tuple[Optional[str], str]:
+        """Extract device name from natural language question.
+
+        Examples:
+        - "show me vlans on SW1" -> ("SW1", "show me vlans")
+        - "what's the uptime on RTR1" -> ("RTR1", "what's the uptime")
+        - "get ip route from EDGE-RTR-1" -> ("EDGE-RTR-1", "get ip route")
+        - "show version" -> (None, "show version")
+
+        Returns:
+            Tuple of (device_name, cleaned_question)
+        """
+        # Pattern to match device references
+        patterns = [
+            r'\bon\s+([A-Z0-9_-]+)',  # "on SW1", "on RTR1"
+            r'\bfrom\s+([A-Z0-9_-]+)',  # "from SW1", "from RTR1"
+            r'\bat\s+([A-Z0-9_-]+)',  # "at SW1", "at RTR1"
+            r'\bfor\s+([A-Z0-9_-]+)',  # "for SW1", "for RTR1"
+            r'\bof\s+([A-Z0-9_-]+)',  # "of SW1", "of RTR1"
+            r'^([A-Z0-9_-]+)\s+',  # "SW1 show vlans" (device at start)
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, question, re.IGNORECASE)
+            if match:
+                device_name = match.group(1).upper()
+
+                # Check if this device exists in inventory
+                if self.inventory_manager and device_name in self.inventory_manager:
+                    # Remove the device reference from question
+                    cleaned_question = re.sub(
+                        pattern, ' ', question, flags=re.IGNORECASE
+                    ).strip()
+
+                    # Clean up extra spaces
+                    cleaned_question = ' '.join(cleaned_question.split())
+
+                    verbose_logger.debug(
+                        f"Extracted device: {device_name}, "
+                        f"cleaned question: {cleaned_question}"
+                    )
+
+                    return device_name, cleaned_question
+
+        return None, question
+
+    def _switch_to_device(self, device_name: str) -> bool:
+        """Switch to a device by name from inventory.
+
+        Args:
+            device_name: Name of device in inventory
+
+        Returns:
+            True if switched successfully
+        """
+        # Get device from inventory
+        device_info = self.inventory_manager.get_device(device_name)
+
+        if not device_info:
+            logger.warning(f"Device '{device_name}' not found in inventory")
+            return False
+
+        # Check if device is already connected
+        if self.device_manager.is_connected(device_name):
+            # Just switch to it
+            try:
+                self.device_manager.switch_device(device_name)
+                verbose_logger.info(f"Switched to existing device '{device_name}'")
+                return True
+            except ValueError as e:
+                logger.warning(f"Could not switch to '{device_name}': {e}")
+                return False
+
+        # Device not connected, connect to it
+        try:
+            verbose_logger.info(f"Connecting to '{device_name}' ({device_info.hostname})...")
+            success = self.device_manager.connect_to_device(device_name, device_info)
+            if success:
+                verbose_logger.info(f"✓ Connected to {device_name}")
+            else:
+                logger.error(f"Failed to connect to {device_name}")
+            return success
+        except Exception as e:
+            logger.error(f"Error connecting to {device_name}: {e}")
+            return False
+
     def _execute_device_command(self, command: str) -> str:
-        """Execute a command after validation."""
+        """Execute a command after validation and device selection."""
+        # Get current connection
+        current_connection = self.device_manager.get_current_connection()
+        if not current_connection:
+            return "❌ No device connected. Please connect to a device first."
+
+        # Validate command
         try:
             self.security_policy.validate_command(command)
         except CommandBlockedError as e:
             if self.audit_logger:
                 self.audit_logger.log_command_blocked(command, e.reason)
             return f"⚠ BLOCKED: {e.reason}"
-        return self._execute_validated_command(command)
 
-    def _execute_validated_command(self, command: str) -> str:
-        """Execute a validated command."""
+        return self._execute_validated_command(command, current_connection)
+
+    def _execute_validated_command(self, command: str, device_connection) -> str:
+        """Execute a validated command on the specified device."""
         try:
             verbose_logger.debug("Executing: %s", command)
-            output = self.device.execute_command(command)
+            output = device_connection.execute_command(command)
             if self.audit_logger:
                 self.audit_logger.log_command_executed(
                     command, success=True, output_length=len(output)
@@ -138,11 +235,25 @@ class Agent:
             return f"⚠️ Error: {e}"
 
     def answer_question(self, question: str) -> str:
-        """Answer a question about the device."""
+        """Answer a question, handling device selection automatically."""
+        # Extract device reference from question
+        device_name, cleaned_question = self._extract_device_reference(question)
+
+        if device_name:
+            # Try to switch to the specified device
+            if not self._switch_to_device(device_name):
+                return f"❌ Could not switch to device '{device_name}'. Check if it exists in inventory."
+        else:
+            # No device specified, use current device or fail
+            current_device = self.device_manager.get_current_device_name()
+            if not current_device:
+                return "❌ No device specified and no current device connected. Please specify a device from your inventory."
+
+        # Process the question with the LLM
         try:
-            verbose_logger.info("Processing Query...")
+            verbose_logger.info("Processing Query: %s", cleaned_question)
             result = self.agent.invoke(
-                {"input": question}, config={"recursion_limit": 8}
+                {"input": cleaned_question}, config={"recursion_limit": 8}
             )
             response = self._extract_response(result)
             verbose_logger.info("Query completed.")

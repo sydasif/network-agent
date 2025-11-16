@@ -1,15 +1,18 @@
-"""User interface for network automation agent."""
+"""User interface for network automation agent with multi-device support."""
 
 import getpass
 import logging
+import os
 import re
 import sys
+from pathlib import Path
 
-from .agent import Agent
+from .agent import EnhancedAgent
 from .audit import AuditLogger, SecurityEventType
+from .device_manager import DeviceManager
 from .exceptions import BlockedContentError, QueryTooLongError
+from .inventory import InventoryManager
 from .logging_config import setup_logging
-from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
 from .settings import settings
 from .utils import print_formatted_header, print_line_separator
@@ -123,14 +126,19 @@ class InputValidator:
 
 
 class UserInterface:
-    """Interactive user interface for network automation."""
+    """Interactive user interface for network automation with inventory support."""
 
-    def __init__(self):
-        """Initialize the user interface."""
+    def __init__(self, inventory_file: str = "inventory.yaml"):
+        """Initialize the user interface.
+
+        Args:
+            inventory_file: Path to inventory file (YAML or JSON)
+        """
         setup_logging(verbose=settings.verbose)
-        self.device = None
+        self.device_manager = None
         self.assistant = None
         self.query_count = 0
+        self.inventory_file = inventory_file
 
         self.max_queries_per_session = settings.max_queries_per_session
 
@@ -147,31 +155,221 @@ class UserInterface:
 
         self.data_protector = SensitiveDataProtector()
 
-    def _prompt_for_device_credentials(self):
-        """Prompt user for device connection details."""
-        hostname = input("\nDevice IP: ").strip()
-        username = input("Username: ").strip()
-        password = getpass.getpass("Password: ")
-        return hostname, username, password
+    def _create_sample_inventory(self):
+        """Create a sample inventory file if none exists."""
+        if os.path.exists(self.inventory_file):
+            return
 
-    def _setup_network_assistant(self):
-        """Initialize the device connection and agent with settings."""
-        self.device = DeviceConnection()
-        self.assistant = Agent(
+        sample_content = """# Network Device Inventory
+# Format: YAML (you can also use JSON)
+
+devices:
+  # Distribution Switches
+  - name: S1
+    hostname: 192.168.121.101
+    username: admin
+    password: admin
+    device_type: cisco_ios
+    description: Floor 1
+    location: Building-A-Floor1
+    role: distribution
+
+  - name: S2
+    hostname: 192.168.121.102
+    username: admin
+    password: admin
+    device_type: cisco_ios
+    description: Floor 2
+    location: Building-A-Floor2
+    role: distribution
+"""
+
+        with open(self.inventory_file, 'w') as f:
+            f.write(sample_content)
+
+        print(ConsoleColors.colorize(
+            f"📦 Created sample inventory file: {self.inventory_file}\n"
+            f"💡 Edit this file to add your network devices.\n",
+            ConsoleColors.INFO
+        ))
+
+    def _setup_with_inventory(self):
+        """Initialize the system with inventory."""
+        # Load inventory
+        inventory_path = Path(self.inventory_file)
+        if not inventory_path.exists():
+            print(ConsoleColors.colorize(
+                f"⚠️  Inventory file not found: {self.inventory_file}",
+                ConsoleColors.WARNING
+            ))
+            # Create sample inventory
+            self._create_sample_inventory()
+
+        self.inventory_manager = InventoryManager(str(inventory_path))
+        self.device_manager = DeviceManager()
+
+        self.assistant = EnhancedAgent(
             groq_api_key=settings.groq_api_key,
-            device=self.device,
+            device_manager=self.device_manager,
+            inventory_manager=self.inventory_manager,
             model_name=settings.model_name,
             temperature=settings.temperature,
-            verbose=settings.verbose,  # ✅ Use from settings
+            verbose=settings.verbose,
             timeout=settings.api_timeout,
             audit_logger=self.audit_logger,
         )
 
+        print(ConsoleColors.colorize(
+            f"📦 Inventory: {len(self.inventory_manager)} devices loaded",
+            ConsoleColors.SUCCESS
+        ))
+
+    def _handle_special_commands(self, question: str) -> bool:
+        """Handle special commands like 'inventory', 'connected', etc.
+
+        Args:
+            question: User input question
+
+        Returns:
+            True if it was a special command, False otherwise
+        """
+        command = question.strip().lower()
+
+        if command == "inventory":
+            self._show_inventory()
+            return True
+
+        elif command == "connected":
+            self._show_connected_devices()
+            return True
+
+        elif command.startswith("switch "):
+            device_name = command[7:].strip().upper()  # Get device name after "switch "
+            self._switch_device(device_name)
+            return True
+
+        elif command.startswith("disconnect "):
+            device_name = command[11:].strip().upper()  # Get device name after "disconnect "
+            self._disconnect_device(device_name)
+            return True
+
+        elif command in ["help", "h"]:
+            self._show_help()
+            return True
+
+        return False
+
+    def _show_inventory(self):
+        """Display the device inventory."""
+        print_line_separator()
+        print("\n📦 Device Inventory:")
+        print()
+
+        # Group devices by role
+        roles = {
+            "core": [],
+            "distribution": [],
+            "access": [],
+            "edge": [],
+            "other": []
+        }
+
+        for device in self.inventory_manager.list_devices():
+            role = device.role.lower() if device.role else "other"
+            if role in roles:
+                roles[role].append(device)
+            else:
+                roles["other"].append(device)
+
+        # Display roles in order
+        role_order = ["core", "distribution", "access", "edge", "other"]
+        for role in role_order:
+            if roles[role]:
+                print(f"  {role.upper()}:")
+                for device in sorted(roles[role], key=lambda d: d.name):
+                    status = "✓" if self.device_manager.is_connected(device.name) else "○"
+                    print(f"    {status} {device.name:<15} {device.hostname:<15} {device.description or ''}")
+                print()
+
+        if not any(roles.values()):
+            print("  No devices in inventory.")
+        print_line_separator()
+
+    def _show_connected_devices(self):
+        """Display connected devices."""
+        print_line_separator()
+        print("\n🔌 Connected Devices:")
+        print()
+
+        connected_devices = self.device_manager.get_connected_devices()
+        current_device = self.device_manager.get_current_device_name()
+
+        if connected_devices:
+            for device_name, connection in connected_devices.items():
+                status = "✓"
+                marker = "  →" if device_name == current_device else "   "
+                print(f"{marker} {status} {device_name:<15} {connection.device_config['host']}")
+        else:
+            print("  No devices currently connected.")
+        print_line_separator()
+
+    def _switch_device(self, device_name: str):
+        """Switch to a specific device."""
+        print_line_separator()
+        if device_name not in self.inventory_manager:
+            print(f"❌ Device '{device_name}' not found in inventory")
+            print(f"💡 Available devices: {', '.join(self.inventory_manager.get_device_names())}")
+        elif not self.device_manager.is_connected(device_name):
+            print(f"❌ Device '{device_name}' is not connected")
+        else:
+            try:
+                self.device_manager.switch_device(device_name)
+                print(f"✓ Switched to device: {device_name}")
+            except ValueError as e:
+                print(f"❌ Could not switch to device '{device_name}': {e}")
+        print_line_separator()
+
+    def _disconnect_device(self, device_name: str):
+        """Disconnect from a specific device."""
+        print_line_separator()
+        if not self.device_manager.is_connected(device_name):
+            print(f"❌ Device '{device_name}' is not connected")
+        else:
+            success = self.device_manager.disconnect_from_device(device_name)
+            if success:
+                print(f"✓ Disconnected from device: {device_name}")
+            else:
+                print(f"❌ Failed to disconnect from device: {device_name}")
+        print_line_separator()
+
+    def _show_help(self):
+        """Show help information."""
+        print_line_separator()
+        print("\n💡 Help - Available Commands:")
+        print()
+        print("  • Ask naturally: 'show vlans on SW1' or 'check RTR1 uptime'")
+        print("  • inventory      - Show all devices in inventory")
+        print("  • connected      - Show currently connected devices")
+        print("  • switch NAME    - Manually switch to a device (e.g., 'switch RTR1')")
+        print("  • disconnect NAME- Disconnect from a device (e.g., 'disconnect SW1')")
+        print("  • help           - Show this help")
+        print("  • quit           - Exit application")
+        print()
+        print("  Natural language patterns:")
+        print("  • 'show version on RTR1'    - Connect to RTR1 and execute command")
+        print("  • 'get interfaces from SW1' - Connect to SW1 and execute command")
+        print("  • 'check status at SW2'     - Connect to SW2 and execute command")
+        print("  • 'what's the uptime for RTR1' - Connect to RTR1 and execute command")
+        print("  • 'show configuration of SW1' - Connect to SW1 and execute command")
+        print_line_separator()
+
     def _run_interactive_session(self):
         """Run the interactive chat session with styled output."""
-        logger.info("\n" + "=" * 60)
-        logger.info("Ready! Type 'quit' to exit")
-        logger.info("=" * 60 + "\n")
+        print(f"\n💡 Tip: Ask naturally like 'show vlans on SW1' or 'check RTR1 uptime'")
+        print("=" * 60)
+        print("Ready! Ask questions about any device in your inventory")
+        print("Type 'help' for commands or ask naturally")
+        print("=" * 60)
 
         while True:
             # Check session limits
@@ -185,10 +383,14 @@ class UserInterface:
                 )
                 break
 
+            # Get current device for prompt
+            current_device = self.device_manager.get_current_device_name()
+            prompt_prefix = f"[{current_device}]" if current_device else ""
+            
             try:
                 # Colored prompt
                 question = input(
-                    f"\n{ConsoleColors.PROMPT}💬 Ask:{ConsoleColors.RESET} "
+                    f"\n{prompt_prefix}{ConsoleColors.PROMPT} 💬 Ask:{ConsoleColors.RESET} "
                 ).strip()
             except (KeyboardInterrupt, EOFError):
                 logger.info(
@@ -204,6 +406,10 @@ class UserInterface:
 
             # Skip empty input
             if not question:
+                continue
+
+            # Handle special commands first
+            if self._handle_special_commands(question):
                 continue
 
             # CRITICAL: Validate user input before processing
@@ -244,28 +450,18 @@ class UserInterface:
 
     def run(self):
         """Run the user interface application."""
-        print_formatted_header("AI Network Agent")
+        print_formatted_header("AI Network Agent - Inventory Edition")
 
         try:
-            # Get connection details
-            hostname, username, password = self._prompt_for_device_credentials()
-
-            # Initialize assistant with settings
-            self._setup_network_assistant()
+            # Initialize with inventory
+            self._setup_with_inventory()
 
             # Log session start
             self.audit_logger.log_session_start(
-                user=username,
-                device=hostname,
+                user="network_admin",
+                device="inventory_based",
                 model=settings.model_name,
             )
-
-            # Connect to device
-            try:
-                self.device.connect(hostname, username, password)
-                self.audit_logger.log_connection_established(hostname, username)
-            except ConnectionError as e:
-                self.audit_logger.log_connection_failed(hostname, username, str(e))
 
             # Run interactive session
             self._run_interactive_session()
@@ -275,14 +471,6 @@ class UserInterface:
                 SecurityEventType.ERROR, f"Configuration error: {e}", severity="error"
             )
             logger.error(ConsoleColors.colorize(f"Error: {e}", ConsoleColors.ERROR))
-        except ConnectionError as e:
-            logger.error(ConsoleColors.colorize(f"{e}", ConsoleColors.ERROR))
-        except KeyboardInterrupt:
-            logger.info(
-                ConsoleColors.colorize(
-                    "\n\n👋 Interrupted. Exiting...", ConsoleColors.INFO
-                )
-            )
         except Exception as e:
             self.audit_logger.log(
                 SecurityEventType.ERROR, f"Unexpected error: {e}", severity="critical"
@@ -293,8 +481,8 @@ class UserInterface:
 
                 traceback.print_exc()
         finally:
-            if self.device:
-                self.device.disconnect()
+            if self.device_manager:
+                self.device_manager.disconnect_all()
 
             self.audit_logger.close()
             logger.info(
