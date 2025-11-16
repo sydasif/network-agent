@@ -1,17 +1,19 @@
 """User interface for network automation agent."""
 
-import re
 import getpass
 import logging
+import re
 import sys
+
 from .agent import Agent
 from .audit import AuditLogger, SecurityEventType
-from .exceptions import QueryTooLongError, BlockedContentError
+from .exceptions import BlockedContentError, QueryTooLongError
+from .logging_config import setup_logging
 from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
 from .settings import settings
 from .utils import print_formatted_header, print_line_separator
-from .logging_config import setup_logging
+
 
 logger = logging.getLogger("net_agent.interface")
 
@@ -264,7 +266,6 @@ class UserInterface:
                 self.audit_logger.log_connection_established(hostname, username)
             except ConnectionError as e:
                 self.audit_logger.log_connection_failed(hostname, username, str(e))
-                raise
 
             # Run interactive session
             self._run_interactive_session()
