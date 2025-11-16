@@ -104,11 +104,8 @@ device = DeviceConnection()
 **`get_connection_status() -> dict`**
 
 - Returns connection status information:
-  - `state`: Current connection state
   - `connected`: Boolean indicating active connection
-  - `is_alive`: Boolean indicating connection health
   - `device`: Device hostname/IP
-  - `last_error`: Last error message (if any)
 
 ---
 
@@ -327,11 +324,3 @@ Defined in `src/audit.py`:
 - `CONNECTION` - Connection event
 - `COMMAND` - Command execution
 - `ERROR` - Error event
-
-### `ConnectionState`
-
-Defined in `src/network_device.py`:
-
-- `DISCONNECTED` - Not connected
-- `CONNECTED` - Connected and active
-- `FAILED` - Connection attempt failed
