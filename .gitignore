@@ -13,3 +13,4 @@ wheels/
 net_lab/
 .env
 logs/
+todo.md
