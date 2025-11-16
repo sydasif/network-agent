@@ -162,7 +162,7 @@ class UserInterface:
             device=self.device,
             model_name=settings.model_name,
             temperature=settings.temperature,
-            verbose=False,  # Hardcoded for now
+            verbose=settings.verbose,  # ✅ Use from settings
             timeout=settings.api_timeout,
             audit_logger=self.audit_logger,
         )

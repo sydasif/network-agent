@@ -1,6 +1,7 @@
 """Simplified configuration management using Pydantic BaseSettings."""
 
 from typing import List
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
 
     # Model settings
     model_name: str = "llama-3.3-70b-versatile"
-    temperature: float = 0.1
+    temperature: float = 0.7
     api_timeout: int = 60
 
     # Security settings

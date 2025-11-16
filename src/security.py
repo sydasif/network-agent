@@ -1,8 +1,9 @@
 """Command security policy for the network agent."""
 
 from typing import Optional
-from .settings import settings
+
 from .exceptions import CommandBlockedError
+from .settings import settings
 
 
 class CommandSecurityPolicy:

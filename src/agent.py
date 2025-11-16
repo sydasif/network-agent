@@ -13,10 +13,11 @@ from typing_extensions import TypedDict
 
 from .audit import AuditLogger
 from .exceptions import CommandBlockedError
+from .logging_config import get_verbose_logger
 from .network_device import DeviceConnection
 from .security import CommandSecurityPolicy
 from .sensitive_data import SensitiveDataProtector
-from .logging_config import get_verbose_logger
+
 
 logger = logging.getLogger("net_agent.agent")
 verbose_logger = get_verbose_logger()
@@ -37,12 +38,17 @@ class Agent:
         device: DeviceConnection,
         model_name: str,
         temperature: float = 0.1,
-        verbose: bool = False,
+        verbose: bool | None = None,  # ✅ Allow None to use settings
         timeout: int = 60,
-        audit_logger: AuditLogger = None,
+        audit_logger: AuditLogger | None = None,
     ) -> None:
         """Initialize the agent."""
         self.device = device
+        # Use settings.verbose as default if not explicitly provided
+        if verbose is None:
+            from .settings import settings
+
+            verbose = settings.verbose
         self.verbose = verbose
         self.timeout = timeout
         self.groq_api_key = groq_api_key
@@ -59,6 +65,7 @@ class Agent:
             verbose_logger.setLevel(logging.INFO)
 
         from langchain_core.prompts import ChatPromptTemplate
+
         from .prompts import SYSTEM_PROMPT
 
         self.execute_command_tool = tool("execute_show_command")(

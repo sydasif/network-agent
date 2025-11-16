@@ -1,12 +1,15 @@
 """Device connection and command execution."""
 
 import logging
-from netmiko import ConnectHandler
-from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
-from .settings import settings
-from .models import ConnectionStatus
 from datetime import datetime
 from typing import Optional
+
+from netmiko import ConnectHandler
+from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
+
+from .models import ConnectionStatus
+from .settings import settings
+
 
 logger = logging.getLogger("net_agent.network_device")
 

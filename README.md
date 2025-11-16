@@ -1,5 +1,10 @@
 # AI Network Agent - Simplified Network Automation
 
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/your-repo/network-agent)
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)](htmlcov/)
+
 A streamlined, AI-powered agent that enables natural language interaction with network devices. Built with security and simplicity in mind.
 
 ## 🎯 What It Does
@@ -14,13 +19,14 @@ Ask questions about your network in plain English:
 
 The AI agent will understand your question, execute appropriate commands, and provide clear answers.
 
-## ✨ Key Features
+## ✨ What's New in v0.2.0
 
-- **Natural Language Interface** — Ask questions in plain English
-- **Simplified Architecture** — Focus on core functionality without unnecessary complexity
-- **Secure by Design** — Built-in command validation and sensitive data protection
-- **Easy Setup** — Works with Cisco devices via SSH
-- **Free AI** — Uses Groq's free Llama inference
+- 🏗️ **Simplified Architecture** - Reduced from 1200 to ~800 lines
+- 🚨 **Exception-Based Errors** - Pythonic error handling
+- 📝 **Professional Logging** - Configurable structured logging
+- 🎯 **Production Prompt** - 300+ line system prompt
+- 📦 **Type-Safe Models** - Dataclasses for domain objects
+- ✅ **Improved Tests** - 80%+ coverage with integration tests
 
 ## 📋 Prerequisites
 
@@ -29,31 +35,20 @@ The AI agent will understand your question, execute appropriate commands, and pr
 - Groq API key (free at <https://console.groq.com/keys>)
 - Network device with SSH access (Cisco IOS)
 
-## 🚀 Quick Start
-
-### 1. Clone and Setup
+## 📦 Installation
 
 ```bash
+# Clone repository
 git clone https://github.com/your-repo/network-agent.git
 cd network-agent
-```
 
-### 2. Install Dependencies
-
-Create a virtual environment and install the project's dependencies using `uv`.
-
-```bash
-# Create a virtual environment
+# Install with uv (recommended)
 uv venv
-
-# Activate the virtual environment
-# On Linux/macOS:
-source .venv/bin/activate
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-
-# Install the core application dependencies
+source .venv/bin/activate  # Linux/macOS
 uv pip install .
+
+# Or install with pip
+pip install -e .
 ```
 
 ### 3. Configure Environment

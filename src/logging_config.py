@@ -19,7 +19,7 @@ def setup_logging(verbose: bool = False):
 
     # Formatter (no colors in logs, colors only in console via separate mechanism)
     formatter = logging.Formatter(
-        "%(asctime)s | %(name)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S"
+        "%(asctime)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S"
     )
     console_handler.setFormatter(formatter)
 
