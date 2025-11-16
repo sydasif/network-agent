@@ -1,13 +1,13 @@
 """User interface for network automation agent."""
 
 import re
+import time
+import getpass
 from .agent import Agent
 from .audit import AuditLogger, SecurityEventType
-from .commands import Commands
-from .config import Config
 from .network_device import DeviceConnection
 from .sensitive_data import SensitiveDataProtector
-from .settings import Settings
+from .settings import settings
 from .utils import print_formatted_header, print_line_separator
 
 
@@ -23,39 +23,6 @@ class InterfaceColors:
 
 class InputValidator:
     """Validate and sanitize user input."""
-
-    # Maximum input length (characters)
-    MAX_QUERY_LENGTH = 500
-
-    # Suspicious patterns that might indicate prompt injection
-    SUSPICIOUS_PATTERNS = [
-        r"ignore\s+(all\s+)?previous\s+instructions",
-        r"new\s+instructions",
-        r"system\s*:?\s*you\s+are",
-        r"override\s+security",
-        r"bypass\s+validation",
-        r"execute\s+command",
-        r"run\s+command",
-        r"<!--.*?-->",  # HTML comments
-        r"```.*?```",   # Code blocks
-        r"###\s*new",   # Markdown headers suggesting override
-        r"reload",      # Direct mention of dangerous commands
-        r"write\s+erase",
-        r"configure\s+terminal",
-        r"conf\s+t",
-        r"copy\s+running",
-        r"no\s+",       # Configuration removal
-    ]
-
-    # Patterns that are always blocked
-    BLOCKED_PATTERNS = [
-        r"<script",     # Script injection
-        r"javascript:",  # JavaScript injection
-        r"\x00",        # Null bytes
-        r"\.\.\/",      # Path traversal
-        r"base64",      # Encoded commands
-        r"eval\(",      # Code execution
-    ]
 
     def __init__(self, audit_logger=None, max_query_length: int = 500):
         """Initialize the validator.
@@ -92,13 +59,13 @@ class InputValidator:
 
             # Log validation failure to audit system
             if self.audit_logger:
-                self.audit_logger.log_validation_failure(query, "Length exceeded")
+                self.audit_logger.log(SecurityEventType.ERROR, f"Validation failed: Length exceeded. Query: {query[:200]}", severity="warning")
 
             return False, error_message
 
         # Check for blocked patterns (immediate rejection)
         query_lower = query.lower()
-        for pattern in InputValidator.BLOCKED_PATTERNS:
+        for pattern in settings.blocked_keywords:
             if re.search(pattern, query_lower, re.IGNORECASE):
                 error_message = (
                     f"❌ Query contains blocked content\n"
@@ -108,45 +75,9 @@ class InputValidator:
 
                 # Log validation failure to audit system
                 if self.audit_logger:
-                    self.audit_logger.log_validation_failure(query, f"Blocked pattern: {pattern}")
+                    self.audit_logger.log(SecurityEventType.ERROR, f"Validation failed: Blocked pattern: {pattern}. Query: {query[:200]}", severity="critical")
 
                 return False, error_message
-
-        # Check for suspicious patterns (warning + rejection)
-        suspicious_matches = []
-        for pattern in InputValidator.SUSPICIOUS_PATTERNS:
-            if re.search(pattern, query_lower, re.IGNORECASE):
-                suspicious_matches.append(pattern)
-
-        if suspicious_matches:
-            error_message = (
-                f"⚠️  Query contains suspicious patterns\n"
-                f"   Detected: {', '.join(suspicious_matches[:3])}\n"
-                f"   This looks like a prompt injection attempt.\n"
-                f"   Please rephrase your question normally."
-            )
-
-            # Log validation failure and prompt injection to audit system
-            if self.audit_logger:
-                self.audit_logger.log_validation_failure(query, f"Suspicious patterns: {suspicious_matches}")
-                self.audit_logger.log_prompt_injection(query, suspicious_matches[:3])
-
-            return False, error_message
-
-        # Check for excessive special characters (might be obfuscation)
-        special_char_count = sum(1 for c in query if not c.isalnum() and not c.isspace())
-        if special_char_count > len(query) * 0.3:  # More than 30% special chars
-            error_message = (
-                f"⚠️  Query contains too many special characters\n"
-                f"   This might be an attempt to obfuscate malicious input.\n"
-                f"   Please use plain language."
-            )
-
-            # Log validation failure to audit system
-            if self.audit_logger:
-                self.audit_logger.log_validation_failure(query, "Too many special characters")
-
-            return False, error_message
 
         return True, ""
 
@@ -183,60 +114,50 @@ class UserInterface:
 
     def __init__(self):
         """Initialize the user interface."""
-        # Unified config (security, logging, limits, and environment variables)
-        self.config = Config("config.yaml")
-
         self.device = None
         self.assistant = None
         self.query_count = 0
 
-        # Get max queries from app config
-        self.max_queries_per_session = self.config.app.security.max_queries_per_session
+        self.max_queries_per_session = settings.max_queries_per_session
 
-        # Initialize audit logger with app config settings
-        log_config = self.config.app.logging
         self.audit_logger = AuditLogger(
-            log_dir=log_config.log_directory,
-            enable_console=log_config.enable_console,
-            enable_file=log_config.enable_file,
-            enable_json=log_config.enable_json,
-            log_level=log_config.log_level,
+            log_dir=settings.log_directory,
+            enable_console=settings.enable_console_logging,
+            enable_file=settings.enable_file_logging,
+            log_level=settings.log_level,
         )
 
-        # Initialize validator with app config settings
         self.validator = InputValidator(
             audit_logger=self.audit_logger,
-            max_query_length=self.config.app.security.max_query_length
+            max_query_length=settings.max_query_length
         )
 
-        # Initialize data protector
         self.data_protector = SensitiveDataProtector()
 
     def _prompt_for_device_credentials(self):
         """Prompt user for device connection details."""
         hostname = input("\nDevice IP: ").strip()
         username = input("Username: ").strip()
-        password = self.config.device_password
+        password = getpass.getpass("Password: ")
         return hostname, username, password
 
-    def _setup_network_assistant(self, api_key: str, settings: dict):
+    def _setup_network_assistant(self):
         """Initialize the device connection and agent with settings."""
-        self.device = DeviceConnection(conn_config=self.config.app.connection)
+        self.device = DeviceConnection()
         self.assistant = Agent(
-            api_key,
-            self.device,
-            model_name=settings["model_name"],
-            temperature=settings["temperature"],
-            verbose=settings["verbose"],
-            timeout=settings["timeout"],
+            groq_api_key=settings.groq_api_key,
+            device=self.device,
+            model_name=settings.model_name,
+            temperature=settings.temperature,
+            verbose=False, # Hardcoded for now
+            timeout=settings.api_timeout,
             audit_logger=self.audit_logger,
-            config=self.config.app,
         )
 
     def _run_interactive_session(self):
         """Run the interactive chat session with styled output."""
         print("\n" + "=" * 60)
-        print("Ready! Type '/help' for commands or 'quit' to exit")
+        print("Ready! Type 'quit' to exit")
         print("=" * 60 + "\n")
 
         while True:
@@ -263,35 +184,9 @@ class UserInterface:
             if not question:
                 continue
 
-            # Check for special commands (these bypass validation)
-            is_special, response = Commands.process_command(self.assistant, question)
-            if is_special:
-                if response:
-                    print_line_separator()
-                    print(response)
-                    print_line_separator()
-                continue
-
             # CRITICAL: Validate user input before processing
             is_valid, error_message = self.validator.validate_query(question)
             if not is_valid:
-                # Log validation failure
-                self.audit_logger.log_validation_failure(question, error_message)
-
-                # Check if it's a prompt injection attempt
-                if "suspicious patterns" in error_message.lower():
-                    # Extract patterns from error message (hacky but works)
-                    patterns = []
-                    if "Detected:" in error_message:
-                        patterns.append(error_message.split("Detected:")[1].split("\n")[0].strip())
-                    else:
-                        # Look for suspicious matches pattern
-                        for pattern in self.validator.SUSPICIOUS_PATTERNS:
-                            if re.search(pattern, question.lower(), re.IGNORECASE):
-                                patterns.append(pattern)
-                                break
-                    self.audit_logger.log_prompt_injection(question, patterns)
-
                 print_line_separator()
                 print(error_message)
                 print_line_separator()
@@ -299,13 +194,6 @@ class UserInterface:
 
             # Sanitize the query
             sanitized_question = self.validator.sanitize_query(question)
-
-            # Log if sanitization changed the query
-            if sanitized_question != question and self.assistant.verbose:
-                # CRITICAL: Don't show original if it might contain secrets
-                safe_original = self.data_protector.sanitize_for_logging(question)
-                print(f"[SANITIZED] Original: {safe_original}")
-                print(f"[SANITIZED] Cleaned:  {sanitized_question}")
 
             # Increment query counter
             self.query_count += 1
@@ -315,15 +203,7 @@ class UserInterface:
 
             try:
                 answer = self.assistant.answer_question(sanitized_question)
-
-                # Add spacing before the answer for better readability
-                if self.assistant.verbose:
-                    # Verbose mode already adds spacing via _extract_response
-                    pass
-                else:
-                    # Non-verbose mode needs a blank line after separator
-                    print()
-
+                print()
                 print(answer)
 
             except Exception as e:
@@ -339,23 +219,17 @@ class UserInterface:
         print_formatted_header("AI Network Agent")
 
         try:
-            # Get configuration settings from user
-            settings = Settings.prompt_all()
-
             # Get connection details
             hostname, username, password = self._prompt_for_device_credentials()
 
-            # Get API key from environment
-            api_key = self.config.groq_api_key
-
             # Initialize assistant with settings
-            self._setup_network_assistant(api_key, settings)
+            self._setup_network_assistant()
 
             # Log session start
             self.audit_logger.log_session_start(
-                user=username,  # Or get from environment
+                user=username,
                 device=hostname,
-                model=settings["model_name"],
+                model=settings.model_name,
             )
 
             # Connect to device
@@ -370,24 +244,14 @@ class UserInterface:
             self._run_interactive_session()
 
         except ValueError as e:
-            self.audit_logger.log_event(
-                SecurityEventType.ERROR_OCCURRED,
-                f"Configuration error: {e}",
-                severity="ERROR",
-                error=str(e),
-            )
+            self.audit_logger.log(SecurityEventType.ERROR, f"Configuration error: {e}", severity="error")
             print(f"Error: {e}")
         except ConnectionError as e:
             print(f"{e}")
         except KeyboardInterrupt:
             print("\n\n👋 Interrupted. Exiting...")
         except Exception as e:
-            self.audit_logger.log_event(
-                SecurityEventType.ERROR_OCCURRED,
-                f"Unexpected error: {e}",
-                severity="CRITICAL",
-                error=str(e),
-            )
+            self.audit_logger.log(SecurityEventType.ERROR, f"Unexpected error: {e}", severity="critical")
             print(f"Error: {e}")
             if self.assistant and self.assistant.verbose:
                 import traceback
@@ -396,6 +260,5 @@ class UserInterface:
             if self.device:
                 self.device.disconnect()
 
-            # CRITICAL: Close audit logger and write summary
             self.audit_logger.close()
-            print(f"\n📝 Audit logs saved to: logs/audit_{self.audit_logger.session_id}.log")
+            print(f"\n📝 Audit logs saved to: {self.audit_logger.log_dir}/audit_{self.audit_logger.session_id}.log")

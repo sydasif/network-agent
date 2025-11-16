@@ -1,126 +1,143 @@
-"""
-Integration test to verify all new features work together.
-"""
+"""Integration tests for the network agent."""
 
-import sys
-import os
-
-# Add src to path so we can import the modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from src.health import HealthStatus, health_check
-from src.config import Config
-from src.metrics import MetricsCollector, MetricsDashboard, MetricType
-from src.network_device import DeviceConnection
+import unittest
+from unittest.mock import Mock, patch, MagicMock
 from src.agent import Agent
-from unittest.mock import Mock
+from src.network_device import DeviceConnection
+from src.audit import AuditLogger
+from src.security import CommandSecurityPolicy
 
 
-def test_integration():
-    """Test that all new features work together."""
-    print("Testing integration of all new features...")
+class TestAgentIntegration(unittest.TestCase):
+    """Integration tests for the Agent class with other components."""
 
-    # 1. Test configuration loading
-    print("  - Testing configuration loading...")
-    config = Config()
-    assert config.app.security.max_query_length == 500  # Default value
-    print("    ✓ Configuration loading works")
+    def setUp(self):
+        """Set up the test case."""
+        self.mock_device = Mock(spec=DeviceConnection)
+        self.mock_audit_logger = Mock(spec=AuditLogger)
 
-    # 2. Test metrics collection
-    print("  - Testing metrics collection...")
-    metrics_collector = MetricsCollector(max_events=1000)
+    @patch('src.agent.CommandSecurityPolicy')
+    @patch('src.agent.ChatGroq')
+    def test_agent_with_valid_command(self, mock_chat_groq, mock_security_policy_class):
+        """Test agent executing a valid command through full pipeline."""
+        # Setup mocks
+        mock_llm = Mock()
+        mock_chat_groq.return_value = mock_llm
+        mock_security_policy = Mock(spec=CommandSecurityPolicy)
+        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy_class.return_value = mock_security_policy
+        
+        # Create agent
+        agent = Agent(
+            groq_api_key='test_key',
+            device=self.mock_device,
+            model_name='test-model',
+            audit_logger=self.mock_audit_logger
+        )
+        
+        # Setup device response
+        self.mock_device.execute_command.return_value = "Valid command output"
+        
+        # Execute command
+        result = agent._execute_device_command("show version")
+        
+        # Verify all components were called correctly
+        mock_security_policy.validate_command.assert_called_once_with("show version")
+        self.mock_device.execute_command.assert_called_once_with("show version")
+        self.mock_audit_logger.log_command_executed.assert_called_once_with(
+            "show version", success=True, output_length=len("Valid command output")
+        )
+        self.assertEqual(result, "Valid command output")
 
-    # Record some events
-    metrics_collector.record_event(MetricType.COMMAND_EXECUTED, {"command": "show version"})
-    metrics_collector.record_event(MetricType.COMMAND_FAILED, {"command": "invalid command"})
-    metrics_collector.record_event(MetricType.PROMPT_INJECTION_ATTEMPT, {"query": "ignore instructions"})
+    @patch('src.agent.CommandSecurityPolicy')
+    @patch('src.agent.ChatGroq')
+    def test_agent_with_blocked_command(self, mock_chat_groq, mock_security_policy_class):
+        """Test agent blocking a command through security policy."""
+        # Setup mocks
+        mock_llm = Mock()
+        mock_chat_groq.return_value = mock_llm
+        mock_security_policy = Mock(spec=CommandSecurityPolicy)
+        mock_security_policy.validate_command.return_value = (False, "Blocked keyword 'reload'")
+        mock_security_policy_class.return_value = mock_security_policy
+        
+        # Create agent
+        agent = Agent(
+            groq_api_key='test_key',
+            device=self.mock_device,
+            model_name='test-model',
+            audit_logger=self.mock_audit_logger
+        )
+        
+        # Execute blocked command
+        result = agent._execute_device_command("reload")
+        
+        # Verify command was blocked and not executed on device
+        mock_security_policy.validate_command.assert_called_once_with("reload")
+        self.mock_device.execute_command.assert_not_called()
+        self.mock_audit_logger.log_command_blocked.assert_called_once_with(
+            "reload", "Blocked keyword 'reload'"
+        )
+        self.assertEqual(result, "⚠ BLOCKED: Blocked keyword 'reload'")
 
-    # Check that events were recorded
-    cmd_metrics = metrics_collector.get_command_metrics()
-    assert cmd_metrics["total_commands"] == 2  # executed + failed
-    print("    ✓ Metrics collection works")
-
-    # 3. Test metrics dashboard
-    print("  - Testing metrics dashboard...")
-    dashboard = MetricsDashboard(metrics_collector)
-    json_report = dashboard.generate_json_report()
-    text_report = dashboard.generate_text_report()
-
-    assert "uptime_seconds" in json_report
-    assert "command_metrics" in json_report
-    assert "NETWORK AGENT METRICS DASHBOARD" in text_report
-    print("    ✓ Metrics dashboard works")
-
-    # 4. Test health checks
-    print("  - Testing health checks...")
-
-    # Create mock objects for health check
-    mock_device = Mock(spec=DeviceConnection)
-    mock_device.get_connection_status.return_value = {
-        "state": "connected",
-        "is_alive": True,
-        "connected": True,
-        "uptime_seconds": 3600
-    }
-    mock_device.connection_attempts = 1
-
-    # Mock agent
-    mock_agent = Mock(spec=Agent)
-    mock_agent.current_model = "llama-3.3-70b-versatile"
-    mock_agent.is_active = True
-    mock_agent.total_commands = 10
-    mock_agent.successful_commands = 9
-
-    # Test health check functions
-    health_status = health_check(mock_device, mock_agent)
-    is_healthy = HealthStatus(mock_device, mock_agent).get_health_status()
-
-    # Verify health status structure
-    assert "connection" in health_status
-    assert "agent" in health_status
-    assert "commands" in health_status
-    assert health_status["connection"]["state"] == "connected"
-    print("    ✓ Health checks work")
-
-    # 5. Test all features working together
-    print("  - Testing all features integration...")
-
-    # Use configuration values to influence metrics collection
-    max_length = config.app.security.max_query_length
-    assert max_length > 0
-
-    # Use metrics to influence health assessment
-    sec_metrics = metrics_collector.get_security_metrics()
-    cmd_metrics = metrics_collector.get_command_metrics()
-
-    # Verify metrics are properly formatted
-    assert isinstance(cmd_metrics["success_rate"], float)
-    assert 0.0 <= cmd_metrics["success_rate"] <= 1.0
-
-    print("    ✓ All features integrate properly")
-
-    # 6. Test configuration affecting metrics behavior
-    print("  - Testing configuration-driven metrics...")
-
-    # Configuration reloading is now handled differently with Pydantic
-    # Reload the configuration to test the reload functionality
-    config.reload()
-    current_length = config.app.security.max_query_length
-    assert current_length > 0
-    print("    ✓ Configuration reload works")
-
-    print("\n🎉 All integration tests passed!")
-    print("✅ Configuration loading and management")
-    print("✅ Metrics collection and dashboard")
-    print("✅ Health monitoring system")
-    print("✅ All features working together")
+    @patch('src.agent.CommandSecurityPolicy')
+    @patch('src.agent.ChatGroq')
+    def test_agent_with_connection_error(self, mock_chat_groq, mock_security_policy_class):
+        """Test agent handling connection errors."""
+        # Setup mocks
+        mock_llm = Mock()
+        mock_chat_groq.return_value = mock_llm
+        mock_security_policy = Mock(spec=CommandSecurityPolicy)
+        mock_security_policy.validate_command.return_value = (True, "")
+        mock_security_policy_class.return_value = mock_security_policy
+        
+        # Create agent
+        agent = Agent(
+            groq_api_key='test_key',
+            device=self.mock_device,
+            model_name='test-model',
+            audit_logger=self.mock_audit_logger
+        )
+        
+        # Setup device to raise connection error
+        self.mock_device.execute_command.side_effect = ConnectionError("Connection failed")
+        
+        # Execute command that will fail
+        result = agent._execute_device_command("show version")
+        
+        # Verify error was handled properly
+        mock_security_policy.validate_command.assert_called_once_with("show version")
+        self.mock_device.execute_command.assert_called_once_with("show version")
+        self.mock_audit_logger.log_command_executed.assert_called_once_with(
+            "show version", success=False, error="Connection failed"
+        )
+        self.assertIn("Connection Error", result)
 
 
-def run_integration_test():
-    """Run the integration test."""
-    print("Running Integration Test Suite...\n")
-    test_integration()
+class TestSecurityIntegration(unittest.TestCase):
+    """Integration tests for security components."""
+
+    def test_command_security_policy_with_settings(self):
+        """Test that security policy uses settings properly."""
+        from src.security import CommandSecurityPolicy
+        from src.settings import settings
+        
+        policy = CommandSecurityPolicy()
+        
+        # Test blocked keyword from settings
+        is_valid, reason = policy.validate_command(f"reload")
+        self.assertFalse(is_valid)
+        self.assertIn("reload", reason)
+        
+        # Test allowed command from settings
+        is_valid, reason = policy.validate_command(f"show version")
+        self.assertTrue(is_valid)
+        self.assertEqual(reason, "")
+        
+        # Test blocked keyword that should be in settings
+        is_valid, reason = policy.validate_command(f"configure terminal")
+        self.assertFalse(is_valid)
+        self.assertIn("configure", reason)
 
 
 if __name__ == "__main__":
-    run_integration_test()
+    unittest.main()

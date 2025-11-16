@@ -1,100 +1,45 @@
-"""Settings and configuration management."""
+"""Simplified configuration management using Pydantic BaseSettings."""
 
-from typing import ClassVar
+from typing import List
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings:
-    """Manage AI agent settings."""
+class Settings(BaseSettings):
+    """
+    Centralized configuration for the network agent.
+    Settings are loaded from environment variables.
+    """
+    # Model settings
+    model_name: str = "llama-3.3-70b-versatile"
+    temperature: float = 0.1
+    api_timeout: int = 60
 
-    MODEL_OPTIONS: ClassVar[dict[str, tuple[str, str]]] = {
-        "1": (
-            "openai/gpt-oss-120b",
-            "GPT-OSS 120B (Recommended - Best for networking)",
-        ),
-        "2": ("llama-3.3-70b-versatile", "Llama 3.3 70B (High quality)"),
-        "3": ("llama-3.1-8b-instant", "Llama 3.1 8B (Fast & economical)"),
-    }
+    # Security settings
+    max_query_length: int = 500
+    max_queries_per_session: int = 100
+    allowed_commands: List[str] = ["show", "display", "get", "dir", "more", "verify"]
+    blocked_keywords: List[str] = [
+        "reload", "write", "erase", "delete", "no", "clear", "configure",
+        "conf", "enable", "copy", "format", "shutdown", "boot",
+        "username", "password", "crypto", "key", "certificate"
+    ]
 
-    TEMPERATURE_OPTIONS: ClassVar[dict[str, tuple[float, str]]] = {
-        "1": (0.0, "Focused (Deterministic)"),
-        "2": (0.1, "Balanced (Recommended)"),
-        "3": (0.3, "Creative (More varied)"),
-    }
+    # Logging settings
+    log_level: str = "INFO"
+    log_directory: str = "logs"
+    enable_console_logging: bool = True
+    enable_file_logging: bool = True
 
-    PLATFORM_OPTIONS: ClassVar[dict[str, tuple[str, str]]] = {
-        "1": ("cisco_ios", "Cisco IOS"),
-        "2": ("cisco_nxos", "Cisco NX-OS"),
-        "3": ("cisco_xr", "Cisco IOS-XR"),
-    }
+    # Connection settings
+    connection_timeout: int = 30
+    read_timeout: int = 60
+    command_timeout: int = 60
+    banner_timeout: int = 15
+    global_delay_factor: int = 2
+    
+    # API Keys
+    groq_api_key: str
+    
+    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
-    def __init__(self):
-        """Initialize settings with defaults."""
-        self.model_name = "openai/gpt-oss-120b"
-        self.temperature = 0.1
-        self.verbose = False
-        self.timeout = 60
-        self.platform = "cisco_ios"
-
-    @staticmethod
-    def get_model() -> tuple:
-        """Prompt user to select AI model."""
-        print("\n🤖 AI Model Selection:")
-        for key, (_, description) in Settings.MODEL_OPTIONS.items():
-            print(f"   {key}. {description}")
-
-        choice = input("   Select model [1]: ").strip() or "1"
-        model, _ = Settings.MODEL_OPTIONS.get(choice, Settings.MODEL_OPTIONS["1"])
-        return model
-
-    @staticmethod
-    def get_temperature() -> float:
-        """Prompt user to select response temperature."""
-        print("\n🎯 Response Style:")
-        for key, (_, description) in Settings.TEMPERATURE_OPTIONS.items():
-            print(f"   {key}. {description}")
-
-        choice = input("   Select style [2]: ").strip() or "2"
-        temp, _ = Settings.TEMPERATURE_OPTIONS.get(
-            choice, Settings.TEMPERATURE_OPTIONS["2"]
-        )
-        return temp
-
-    @staticmethod
-    def get_platform() -> str:
-        """Prompt user to select device platform."""
-        print("\n🔌 Device Platform:")
-        for key, (_, description) in Settings.PLATFORM_OPTIONS.items():
-            print(f"   {key}. {description}")
-
-        choice = input("   Select platform [1]: ").strip() or "1"
-        platform, _ = Settings.PLATFORM_OPTIONS.get(
-            choice, Settings.PLATFORM_OPTIONS["1"]
-        )
-        return platform
-
-    @staticmethod
-    def get_verbose() -> bool:
-        """Prompt user for verbose mode."""
-        verbose_input = input("\n📝 Enable verbose mode? (y/n) [n]: ").strip().lower()
-        return verbose_input in ["y", "yes"]
-
-    @staticmethod
-    def get_timeout() -> int:
-        """Prompt user for API timeout."""
-        timeout_input = input("\n⏱️  API timeout in seconds [60]: ").strip()
-        return int(timeout_input) if timeout_input.isdigit() else 60
-
-    @staticmethod
-    def prompt_all() -> dict:
-        """Prompt user for all settings."""
-        print("\n" + "=" * 60)
-        print("AI Network Agent - Configuration")
-        print("=" * 60)
-
-        return {
-            "model_name": Settings.get_model(),
-            "temperature": Settings.get_temperature(),
-            "platform": Settings.get_platform(),
-            "verbose": Settings.get_verbose(),
-            "timeout": Settings.get_timeout(),
-        }
+settings = Settings()

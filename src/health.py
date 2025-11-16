@@ -38,7 +38,6 @@ class HealthStatus:
             "timestamp": datetime.now().isoformat(),
             "connection": self._get_connection_status(),
             "agent": self._get_agent_status(),
-            "commands": self._get_command_stats(),
             "system": self._get_system_info(),
         }
 
@@ -54,9 +53,6 @@ class HealthStatus:
             "state": connection_status.get("state", "unknown"),
             "alive": connection_status.get("is_alive", False),
             "connected": connection_status.get("connected", False),
-            "connection_attempts": getattr(self.device, 'connection_attempts', 0),
-            "last_connection_attempt": getattr(self.device, 'last_connection_attempt', None),
-            "uptime_seconds": connection_status.get("uptime_seconds", 0),
         }
 
     def _get_agent_status(self) -> Dict[str, Any]:
@@ -66,34 +62,9 @@ class HealthStatus:
             Dictionary with agent health information
         """
         return {
-            "model": getattr(self.agent, 'current_model', 'unknown'),
+            "model": getattr(self.agent, 'model_name', 'unknown'),
             "active": getattr(self.agent, 'is_active', True),
             "last_query_time": getattr(self.agent, 'last_query_time', None),
-            "model_fallback_count": getattr(self.agent, 'model_fallback_count', 0),
-            "rate_limit_used": getattr(self.agent, 'rate_limit_used', 0),
-            "rate_limit_remaining": getattr(self.agent, 'rate_limit_remaining', 30),  # Default to 30
-        }
-
-    def _get_command_stats(self) -> Dict[str, Any]:
-        """Get command execution statistics.
-
-        Returns:
-            Dictionary with command statistics
-        """
-        total_commands = getattr(self.agent, 'total_commands', 0)
-        successful_commands = getattr(self.agent, 'successful_commands', 0)
-
-        if total_commands > 0:
-            success_rate = successful_commands / total_commands
-        else:
-            success_rate = 1.0  # If no commands, consider it 100% successful
-
-        return {
-            "total": total_commands,
-            "successful": successful_commands,
-            "failed": total_commands - successful_commands,
-            "success_rate": success_rate,
-            "last_command_time": getattr(self.agent, 'last_command_time', None),
         }
 
     def _get_system_info(self) -> Dict[str, Any]:
