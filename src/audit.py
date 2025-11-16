@@ -82,6 +82,10 @@ class AuditLogger:
             f"Session started by {safe_user} connecting to {safe_device} with model {model}",
         )
 
+    def log_session_end(self):
+        """Log session end."""
+        self.log(SecurityEventType.SESSION_END, "Session ended.")
+
     def log_connection_established(self, device: str, username: str):
         """Log successful device connection."""
         safe_device = self.data_protector.sanitize_for_logging(device)
@@ -148,5 +152,4 @@ class AuditLogger:
 
     def close(self):
         """Close the logger."""
-        self.log(SecurityEventType.SESSION_END, "Session ended.")
         logging.shutdown()
