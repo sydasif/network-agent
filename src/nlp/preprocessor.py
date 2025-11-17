@@ -1,7 +1,7 @@
 """
 NLP Pre-processing Layer using spaCy.
 This pre-processor is SELF-CONFIGURING. It dynamically builds its rules
-by reading the command_templates.yaml file, ensuring the NLP layer is
+by reading the command.yaml file, ensuring the NLP layer is
 always in sync with the agent's capabilities.
 """
 import spacy
@@ -13,7 +13,7 @@ from src.tools.inventory import network_manager
 from src.core.config import settings
 
 class NLPPreprocessor:
-    def __init__(self, template_file: str = "command_templates.yaml"):
+    def __init__(self, template_file: str = "command.yaml"):
         """
         Initializes the spaCy model and dynamically builds intent rules and
         entity matchers from the command template file.

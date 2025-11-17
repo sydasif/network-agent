@@ -52,7 +52,7 @@ The core of V3 is a new **NLP-First** architecture. Every user query goes throug
 │   ├── core
 │   │   ├── config.py
 │   │   ├── models.py
-│   │   └── network_manager.py
+│   │   └── manager.py
 │   ├── graph
 │   │   └── workflow.py
 │   ├── nlp
@@ -173,7 +173,7 @@ python main.py ingest-logs
 - `src/core/`: Provides the foundational building blocks:
   - `config.py`: Centralized application settings.
   - `models.py`: Pydantic data models that act as contracts between all components.
-  - `network_manager.py`: The robust, encapsulated service for all device interactions.
+  - `manager.py`: The robust, encapsulated service for all device interactions.
 - `main.py`: The Typer-based CLI entry point for the application.
 
 ## 🗺️ Future Roadmap
