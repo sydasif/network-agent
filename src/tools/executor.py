@@ -1,31 +1,22 @@
+"""Tool for executing network commands."""
 from langchain_core.tools import tool
-
-from src.core.network_manager import NetworkManager
-
-
-# Initialize network manager
-network_manager = NetworkManager("inventory.yaml")
-
+from src.core.models import CommandOutput
+from src.tools.inventory import network_manager # Reuse the same instance
 
 @tool
-def run_network_command(device_name: str, command: str) -> str:
+def run_network_command(device_name: str, command: str) -> CommandOutput:
     """
-    Execute network CLI commands on devices.
-
-    Use this tool when the user wants to:
-    - Run show commands (show vlan, show interfaces, show version, etc.)
-    - Get device configuration or status
-    - Execute any CLI command on a network device
-
-    Args:
-        device_name: Name of the device to execute command on
-        command: The CLI command to execute
-
-    Returns: Sanitized CLI output from the device
+    Executes a read-only CLI command on a specified network device.
+    Use this for 'show' commands to get operational status or configuration.
     """
     try:
-        return network_manager.execute_command(device_name, command)
-    except ValueError as e:
-        return f"Command error: {e}"
+        output = network_manager.execute_command(device_name, command)
+        return CommandOutput(device_name=device_name, command=command, output=output)
     except Exception as e:
-        return f"Error executing command: {e}"
+        return CommandOutput(
+            device_name=device_name,
+            command=command,
+            output="",
+            status="error",
+            error_message=str(e),
+        )

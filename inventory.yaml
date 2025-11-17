@@ -1,5 +1,5 @@
-# Network Device Inventory
-# Format: YAML (you can also use JSON)
+# Network Device Inventory - V2
+# Format: YAML
 
 devices:
   # Distribution Switches
@@ -8,15 +8,24 @@ devices:
     username: admin
     password: admin
     device_type: cisco_ios
-    description: Floor 1
-    location: Building-A-Floor1
+    description: Floor 1 Distribution Switch
     role: distribution
+    connection_protocol: netmiko # New field
 
   - name: S2
     hostname: 192.168.121.102
     username: admin
     password: admin
     device_type: cisco_ios
-    description: Floor 2
-    location: Building-A-Floor2
+    description: Floor 2 Distribution Switch
     role: distribution
+    connection_protocol: netmiko # New field
+
+  - name: core-router-gnmi
+    hostname: 10.0.0.1
+    username: cisco
+    password: cisco
+    device_type: cisco_xr
+    description: Core router with gNMI support
+    role: core
+    connection_protocol: gnmi # Example for a modern device

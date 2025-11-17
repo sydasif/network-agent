@@ -1,18 +1,20 @@
 [project]
-name = "network-agent"
-version = "0.1.0"
+name = "network-agent-v3"
+version = "3.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "groq>=0.33.0",
-    "langchain>=0.2.0,<0.3.0", # Latest 0.2.x version
-    "langchain-groq>=0.1.0,<0.2.0", # Compatible version with langchain 0.2.x
-    "langgraph>=0.1.0,<0.2.0", # Latest 0.1.x version
+    "langchain>=0.2.0,<0.3.0",
+    "langchain-groq>=0.1.0,<0.2.0",
+    "langgraph>=0.1.0,<0.2.0",
     "netmiko>=4.6.0",
-    "pytest>=9.0.1",
     "python-dotenv>=1.2.1",
     "pydantic>=2.0.0",
     "pyyaml>=6.0",
-    "pydantic-settings>=2.12.0",
+    # New dependencies for V2
+    "langchain-community>=0.2.0", # For text splitters and other utilities
+    # New dependency for V3
+    "spacy>=3.7.0",
 ]
 
 [dependency-groups]
