@@ -1,6 +1,6 @@
 [project]
-name = "network-agent"
-version = "4.0.0"
+name = "nlp-network-agent"
+version = "1.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "groq>=0.33.0",

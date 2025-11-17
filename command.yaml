@@ -48,12 +48,6 @@ find_device:
     command: "show inventory"
     description: "Find and list network devices."
 
-troubleshoot_history:
-  - keywords: [ "history", "log", "logs", "past", "error", "errors", "flap", "flaps", "yesterday", "last night" ]
-    entities:
-      KEYWORD: [ "history", "log", "error", "flap" ]
-    command: "show logging last 1 hour"
-    description: "Shows historical logs for troubleshooting."
 
 greeting:
   - keywords: [ "hello", "hi", "hey", "greetings" ]

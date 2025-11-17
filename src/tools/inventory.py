@@ -3,7 +3,7 @@
 from typing import List
 from langchain_core.tools import tool
 from src.core.models import DeviceInfo
-from src.core.manager import NetworkManager
+from src.core.network_manager import NetworkManager
 from src.core.config import settings
 
 # Initialize a single NetworkManager instance to be shared by tools

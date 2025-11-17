@@ -1,175 +1,126 @@
-# AI Network Agent : he NLP-First Network Co-pilot
+# NLP Network Agent
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Welcome to the AI Network Agent, a production-ready, AI-powered co-pilot designed to bridge the gap between natural language and complex network operations. This version introduces a sophisticated, local-first NLP layer for faster, more reliable, and more intelligent interactions.
-
-This project is the culmination of extensive research into modern AI agent architectures, built with a focus on reliability, maintainability, and real-world applicability.
+An intelligent, NLP-powered network operations co-pilot designed to bridge the gap between natural language and network device management. This agent enables network administrators to diagnose and troubleshoot network issues using everyday language instead of complex CLI commands.
 
 ## ✨ Key Features
 
-- **⚡️ spaCy NLP Layer:** Instantly classifies user intent and extracts key entities (devices, interfaces, protocols) locally for exceptional speed and privacy.
-- **🧠 Intelligent Routing:** Simple greetings or ambiguous questions are handled immediately without engaging the full AI workflow, saving time and resources.
-- **🔗 Multi-Agent Workflow (LangGraph):** A robust Planner/Executor agent team, orchestrated by LangGraph, decomposes and executes complex, multi-step tasks.
-- **📄 Structured Data Contracts (Pydantic):** All tools and agents communicate using reliable Pydantic models, ensuring data consistency and predictable behavior.
-- **💬 Conversational Memory:** The agent remembers the context of your conversation, allowing for natural follow-up questions.
-- **🔌 Multi-Protocol Ready:** The core `NetworkManager` is designed to support modern protocols like gNMI alongside traditional CLI/SSH via Netmiko.
-- **🛡️ Built-in Security:** Includes guardrails to block potentially dangerous commands and sanitize sensitive information from outputs.
+- **⚡ NLP-First Architecture:** Local spaCy NLP pre-processor instantly classifies user intent and extracts entities (devices, interfaces, protocols) for faster, more reliable interactions.
+- **🧠 Multi-Agent Workflow:** Planner/Executor agent team orchestrated by LangGraph for complex, multi-step network diagnostics.
+- **📄 Structured Data Contracts:** Pydantic models ensure consistent communication between all components.
+- **💬 Conversational Interface:** Natural language interaction with conversational memory for follow-up questions.
+- **🔌 Multi-Protocol Support:** Designed to support both traditional CLI/SSH and modern network protocols like gNMI.
+- **🛡️ Built-in Security:** Command filtering and output sanitization to prevent dangerous operations.
 
-## 🏗️ Architecture: Understand, Then Plan
+## 🏗️ Architecture Overview
 
-The core is a new **NLP-First** architecture. Every user query goes through a deterministic, spaCy-powered pre-processing step before any AI reasoning is invoked. This makes the system faster, cheaper, and more reliable.
+The agent uses a **NLP-First** architecture that processes queries through a deterministic pre-processing step before engaging the AI workflow:
 
-**Data Flow:**
-
-```bash
-[User Input] -> [spaCy NLP Pre-processor] -> [Structured Intent] -> [Intelligent Router] -> [LangGraph Workflow] -> [Final Response]
+```
+[User Input] -> [spaCy NLP Pre-processor] -> [Structured Intent] -> [Intelligent Router] -> [LangGraph Workflow] -> [Response]
 ```
 
-1. **NLP Pre-processor:** The user's query is instantly analyzed by a local spaCy model to determine intent and extract entities.
-2. **Intelligent Router:** The main application logic inspects the structured intent. Simple cases (like greetings) are handled immediately. Ambiguous requests are rejected with a helpful prompt.
-3. **LangGraph Workflow:** Only valid, understood requests are passed to the multi-agent system.
-    - **Planner Agent:** Receives the structured intent and creates a step-by-step plan of tool calls.
-    - **Executor Agent:** Executes the tools in the plan.
-    - **Generator Node:** Synthesizes the results into a final, human-readable response.
+### Core Components:
 
-## 📂 Directory Structure
+1. **NLP Pre-processor** - Extracts intent and entities using local spaCy model
+2. **Intelligent Router** - Handles simple queries and routes complex ones to the workflow
+3. **LangGraph Workflow** - Multi-agent system:
+   - Planner Agent: Creates execution plans from structured intents
+   - Executor Agent: Runs network commands and tools
+   - Generator Node: Synthesizes results into responses
 
-```bash
+## 📁 Project Structure
+
+```
 .
-├── .env
-├── inventory.yaml
-├── main.py
-├── pyproject.toml
+├── command.yaml          # NLP command mappings and keywords
+├── inventory.yaml        # Network device inventory
+├── main.py              # CLI entry point
+├── pyproject.toml       # Project dependencies
 ├── README.md
-├── src
-│   ├── agents
-│   │   ├── executor.py
-│   │   └── planner.py
-│   ├── core
-│   │   ├── config.py
-│   │   ├── models.py
-│   │   └── manager.py
-│   ├── graph
-│   │   └── workflow.py
-│   ├── nlp
-│   │   └── preprocessor.py
-│   └── tools
-│       ├── executor.py
-│       └── inventory.py
+└── src/
+    ├── agents/          # LangGraph agents (planner, executor)
+    ├── core/            # Core models and network manager
+    ├── graph/           # LangGraph workflow
+    ├── nlp/             # NLP preprocessor
+    └── tools/           # Network tools
 ```
 
 ## 🚀 Getting Started
 
-Follow these steps to get the AI Network Agent running on your local machine.
-
-### 1. Prerequisites
+### Prerequisites
 
 - Python 3.12+
-- Access to network devices via SSH.
-- A Groq API key for the LLM.
+- Network device access via SSH
+- Groq API key for LLM access
 
-### 2. Installation
+### Installation
 
-Clone the repository and install the required dependencies.
-
+1. Clone the repository:
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd <your-repo-directory>
+git clone <repository-url>
+cd nlp-network-agent
+```
 
-# Install dependencies from pyproject.toml
-pip install .```
+2. Install dependencies using uv:
+```bash
+uv sync
+```
 
-### 3. Download NLP Model
-
-Run this command once to download the required spaCy model for the NLP layer.
-
+3. Install required NLP model:
 ```bash
 python -m spacy download en_core_web_sm
 ```
 
-Alternatively, you can install the model as an optional dependency:
-
-```bash
-pip install .[nlp-models]
+4. Set up environment:
+Create a `.env` file in the project root:
+```
+GROQ_API_KEY="your_groq_api_key"
 ```
 
-### 4. Set Up Environment
-
-Create a `.env` file in the root directory of the project and add your Groq API key.
-
-**.env**
-
-```
-GROQ_API_KEY="gsk_YourSecretGroqApiKey"
-```
-
-### 5. Configure Inventory
-
-Edit the `inventory.yaml` file to include the network devices you want the agent to manage.
-
-**inventory.yaml**
-
+5. Configure your network inventory in `inventory.yaml`:
 ```yaml
 devices:
   - name: S1
     hostname: 192.168.1.10
-    username: your_user
-    password: your_password
+    username: admin
+    password: password
     device_type: cisco_ios
     connection_protocol: netmiko
+    role: switch
 
   - name: R1
     hostname: 192.168.1.1
-    username: your_user
-    password: your_password
+    username: admin
+    password: password
     device_type: cisco_ios
     connection_protocol: netmiko
+    role: router
 ```
-
 
 ## 💻 Usage
 
-The application is run via a command-line interface powered by Typer.
-
-### Start an Interactive Chat Session
-
-This is the main mode of operation.
+Start an interactive chat session:
 
 ```bash
-python main.py chat
+uv run python main.py chat
 ```
 
-Once the agent is running, you can ask it questions in natural language.
-
-**Example Questions:**
-
+Example queries:
+- `show interfaces on S1`
 - `list all devices`
-- `show me the vlans on S1`
+- `show running config on R1`
 - `what is the status of the interfaces on R1?`
-- `show me the running config on R1`
 
-## 🛠️ Core Components Explained
+## 🤝 Contributing
 
-- `src/nlp/preprocessor.py`: The heart of the NLP-First architecture. Uses spaCy to convert raw text into a structured `UserIntent`.
-- `src/graph/workflow.py`: The LangGraph-based multi-agent system that orchestrates planning and execution.
-- `src/tools/`: Contains the individual capabilities of the agent (inventory search, command execution).
-- `src/core/`: Provides the foundational building blocks:
-  - `config.py`: Centralized application settings.
-  - `models.py`: Pydantic data models that act as contracts between all components.
-  - `manager.py`: The robust, encapsulated service for all device interactions.
-- `main.py`: The Typer-based CLI entry point for the application.
+This project follows modern Python best practices:
 
-## 🗺️ Future Roadmap
-
-This project provides a solid foundation. Future work could include:
-
-- **Comprehensive Testing:** Building a suite of unit and integration tests.
-- **CI/CD Pipeline:** Automating testing and deployment with GitHub Actions.
-- **Containerization:** Packaging the application with Docker for easy deployment.
-- **Tool Expansion:** Adding new tools for configuration changes (with human-in-the-loop confirmation) or integration with other systems like an IPAM or monitoring platform.
+- Dependency management with `uv`
+- Code formatting with `ruff`
+- Type checking and linting with `ruff`
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
