@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     groq_model_name: str = "llama-3.1-8b-instant"
     groq_temperature: float = 0.0
     groq_api_key: str = ""
+    state_database_file: str = "agent_state.db"
 
     class Config:
         env_file = ".env"

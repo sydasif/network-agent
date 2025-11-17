@@ -2,12 +2,15 @@
 import os
 from pathlib import Path
 import typer
+import yaml
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage
 from src.graph.workflow import NetworkWorkflow
 from src.nlp.preprocessor import NLPPreprocessor
 from src.tools.inventory import network_manager
 from src.core.config import settings
+from src.core.state_manager import StateManager
+from src.agents.analyzer import ProactiveAnalyzer
 
 
 # Create a Typer app
@@ -90,6 +93,56 @@ def chat():
     print("\n👋 All network sessions closed. Goodbye!")
 
 
+@app.command()
+def analyze():
+    """Runs a single, on-demand health analysis across all devices."""
+    load_dotenv()
+    print("🤖 AI Network Agent - On-Demand Health Analysis")
+    print("=" * 60)
+
+    groq_api_key = os.getenv("GROQ_API_KEY") or settings.groq_api_key
+    if not groq_api_key:
+        print("⚠️ GROQ_API_KEY not set!")
+        return
+
+    state_manager = StateManager()
+    analyzer = ProactiveAnalyzer(api_key=groq_api_key)
+
+    with open("command.yaml", "r") as f:
+        health_checks = yaml.safe_load(f).get("health_checks", [])
+
+    if not health_checks:
+        print("❌ No health checks defined in command.yaml. Exiting.")
+        return
+
+    print(f"📈 Analyzing {len(network_manager.devices)} devices with {len(health_checks)} checks...")
+    print("-" * 40)
+
+    for device in network_manager.devices.values():
+        print(f"Device: {device.name}")
+        for check in health_checks:
+            command = check["command"]
+            try:
+                current_state = {"output": network_manager.execute_command(device.name, command)}
+                previous_state = state_manager.get_latest_snapshot(device.name, command)
+
+                if previous_state:
+                    analysis = analyzer.analyze_change(device.name, command, previous_state, current_state)
+                    significance = analysis['significance']
+                    summary = analysis['summary']
+                    print(f"  - Check '{command}': [{significance}] {summary}")
+                else:
+                    print(f"  - Check '{command}': [Informational] First run, storing baseline state.")
+
+                state_manager.save_snapshot(device.name, command, current_state)
+
+            except Exception as e:
+                print(f"  - Check '{command}': [Error] {e}")
+        print("-" * 40)
+
+    network_manager.close_all_sessions()
+    state_manager.close()
+    print("✅ Analysis complete.")
 
 
 if __name__ == "__main__":

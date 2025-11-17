@@ -12,6 +12,7 @@ An intelligent, NLP-powered network operations co-pilot designed to bridge the g
 - **💬 Conversational Interface:** Natural language interaction with conversational memory for follow-up questions.
 - **🔌 Multi-Protocol Support:** Designed to support both traditional CLI/SSH and modern network protocols like gNMI.
 - **🛡️ Built-in Security:** Command filtering and output sanitization to prevent dangerous operations.
+- **📈 On-Demand Health Analysis:** Proactively analyzes device health by comparing current state to the last known state, using an LLM to identify significant changes.
 
 ## 🏗️ Architecture Overview
 
@@ -112,6 +113,17 @@ Example queries:
 - `list all devices`
 - `show running config on R1`
 - `what is the status of the interfaces on R1?`
+
+Run a single, on-demand health analysis across all devices:
+
+```bash
+uv run python main.py analyze
+```
+
+## 🚀 Future Roadmap
+
+- **Proactive Monitoring Service:** Evolve the `analyze` command into a continuously running service (daemon) that performs health checks on a schedule (e.g., every 15 minutes).
+- **Collaborative Alerting:** Integrate a notification service to push `Critical` or `Warning` findings from the analysis to platforms like Slack or Webex, turning the agent into a true team collaborator.
 
 ## 🤝 Contributing
 

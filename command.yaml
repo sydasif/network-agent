@@ -61,3 +61,12 @@ greeting:
 global_entities:
   PROTOCOL: [ "ospf", "eigrp", "spanning-tree", "stp" ]
   KEYWORD: [ "flaps", "errors", "config", "down", "up", "critical" ]
+
+# New section for the on-demand analysis feature
+health_checks:
+  - command: "show ip interface brief"
+    description: "Monitor for interface status changes (up/down)."
+  - command: "show processes cpu sorted | include one minute"
+    description: "Monitor for high CPU utilization."
+  - command: "show memory statistics"
+    description: "Monitor for low memory conditions."
