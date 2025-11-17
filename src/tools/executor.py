@@ -20,13 +20,17 @@ sanitizer = SensitiveDataHandler()
 @tool
 def run_network_command(query: str) -> str:
     """
-    Full pipeline:
-    - extract device from natural language
-    - find device in inventory
-    - switch/connect to the device
-    - validate CLI
-    - execute command
-    - return sanitized CLI output
+    Execute network CLI commands on devices.
+
+    Use this tool when the user wants to:
+    - Run show commands (show vlan, show interfaces, show version, etc.)
+    - Get device configuration or status
+    - Execute any CLI command on a network device
+
+    Input should be the user's query including device name and command.
+    Example inputs: "show vlans on D1", "check interfaces on D2"
+
+    Returns: Raw CLI output from the device
     """
 
     # 1 — Extract device reference from query
