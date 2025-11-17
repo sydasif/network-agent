@@ -1,5 +1,3 @@
-"""Executor tool for network commands."""
-
 from langchain_core.tools import tool
 
 from src.core.command_executor import CommandExecutor
@@ -10,29 +8,48 @@ from src.core.sensitive_data import SensitiveDataHandler
 from src.core.validation import ValidationPipeline
 
 
-inv = InventoryManager("inventory.yaml")
-router = DeviceRouter(DeviceManager(), inv)
+# Load core components
+inventory = InventoryManager("inventory.yaml")
+device_manager = DeviceManager()
+router = DeviceRouter(device_manager, inventory)
 validator = ValidationPipeline()
 executor = CommandExecutor()
-san = SensitiveDataHandler()
+sanitizer = SensitiveDataHandler()
 
 
 @tool
 def run_network_command(query: str) -> str:
     """
     Full pipeline:
-    extract device → validate → sanitize → execute and return CLI output.
+    - extract device from natural language
+    - find device in inventory
+    - switch/connect to the device
+    - validate CLI
+    - execute command
+    - return sanitized CLI output
     """
-    # extract device
-    device, cleaned = router.extract_device_reference(query)
 
-    # validate and clean
-    cleaned = validator.sanitize_query(cleaned)
-    validator.validate_query(cleaned)
+    # 1 — Extract device reference from query
+    device_name, cleaned_query = router.extract_device_reference(query)
+    if not device_name:
+        return "No device mentioned in the query."
 
-    # switch device and run
-    device_session = router.device_manager.switch_device_session(device)
-    output = executor.execute_command(cleaned, device_session)
+    # 2 — Find device in inventory
+    device = inventory.find_device_by_name(device_name)
+    if not device:
+        return f"Device '{device_name}' not found in inventory."
 
-    # sanitize CLI output
-    return san.clean_output(output)
+    # 3 — Switch or create new session
+    session = device_manager.switch_device_session(device)
+    if not session:
+        return f"Could not create session for {device.name}."
+
+    # 4 — Validate CLI
+    cleaned_query = validator.sanitize_query(cleaned_query)
+    validator.validate_query(cleaned_query)
+
+    # 5 — Execute command
+    raw_output = executor.execute_command(cleaned_query, session)
+
+    # 6 — Sanitize and return output
+    return sanitizer.clean_output(raw_output)

@@ -16,15 +16,19 @@ class DeviceRouter:
         self.device_manager = device_manager
         self.inventory_manager = inventory_manager
 
-    def extract_device_reference(self, query: str) -> Tuple[Optional[Device], str]:
+    def extract_device_reference(self, query: str) -> Tuple[Optional[str], str]:
         """Extract device reference from query and return cleaned query."""
         # Look for device names in the query (e.g. "show version on R1", "R1 show interfaces")
         # Common patterns for device references in queries
         patterns = [
+            r"on\s+\w+\s+(\w+)",  # "show version on device R1" (captures the word after 'device')
+            r"for\s+\w+\s+(\w+)",  # "show interfaces for switch R1" (captures the word after 'switch')
             r"on\s+(\w+)",  # "show version on R1"
+            r"from\s+(\w+)",  # "get running config from D2"
+            r"of\s+(\w+)",  # "check status of D1"
+            r"for\s+(\w+)",  # "show interfaces for R1"
             r"^(\w+)\s+",  # "R1 show version"
             r"(\w+)\s+.*show",  # "R1 show something"
-            r"for\s+(\w+)",  # "show interfaces for R1"
         ]
 
         device_name = None
@@ -48,11 +52,11 @@ class DeviceRouter:
                 cleaned_query = re.sub(
                     r"^on\s+|^for\s+", "", cleaned_query, flags=re.IGNORECASE
                 ).strip()
-                return device, cleaned_query
+                return device.name, cleaned_query  # Return device name as string, not device object
 
         # If no device reference found, try to infer from context or return first device
         devices = self.inventory_manager.list_devices()
         if devices:
-            return devices[0], query  # Default to first device if none specified
+            return devices[0].name, query  # Return device name as string, not device object
 
         return None, query
