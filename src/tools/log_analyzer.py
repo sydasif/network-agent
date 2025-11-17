@@ -1,11 +1,12 @@
 """Tool for analyzing historical syslog data using SQLite FTS."""
+
 import sqlite3
-import re
 from langchain_core.tools import tool
 from src.core.models import LogAnalysisOutput
 
 # Setup for the log analysis tool
 DB_PATH = "./syslogs.db"
+
 
 @tool
 def analyze_logs(query: str) -> LogAnalysisOutput:
@@ -25,15 +26,18 @@ def analyze_logs(query: str) -> LogAnalysisOutput:
         # Try FTS with different query formats - only use valid FTS syntax
         try:
             # Simple term search
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT log_entry FROM syslog_fts
                 WHERE syslog_fts MATCH ?
                 ORDER BY rank
                 LIMIT 5
-            """, (query,))
+            """,
+                (query,),
+            )
 
             rows = cursor.fetchall()
-            relevant_logs = [row['log_entry'] for row in rows]
+            relevant_logs = [row["log_entry"] for row in rows]
         except sqlite3.Error:
             # If FTS fails, continue with LIKE search
             pass
@@ -42,32 +46,40 @@ def analyze_logs(query: str) -> LogAnalysisOutput:
         if not relevant_logs:
             # Split query into words and search for any of them
             query_words = query.lower().split()
-            where_conditions = " OR ".join(["log_message LIKE ? OR device_name LIKE ?"] * len(query_words))
+            where_conditions = " OR ".join(
+                ["log_message LIKE ? OR device_name LIKE ?"] * len(query_words)
+            )
             params = []
             for word in query_words:
-                params.extend([f'%{word}%', f'%{word}%'])
+                params.extend([f"%{word}%", f"%{word}%"])
 
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT log_entry FROM syslog
                 WHERE {where_conditions}
                 ORDER BY id
                 LIMIT 5
-            """, params)
+            """,
+                params,
+            )
 
             rows = cursor.fetchall()
-            relevant_logs = [row['log_entry'] for row in rows]
+            relevant_logs = [row["log_entry"] for row in rows]
 
         # If still no results, try a simple contains search
         if not relevant_logs:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT log_entry FROM syslog
                 WHERE log_entry LIKE ?
                 ORDER BY id
                 LIMIT 5
-            """, (f'%{query}%',))
+            """,
+                (f"%{query}%",),
+            )
 
             rows = cursor.fetchall()
-            relevant_logs = [row['log_entry'] for row in rows]
+            relevant_logs = [row["log_entry"] for row in rows]
 
         conn.close()
 
@@ -77,14 +89,12 @@ def analyze_logs(query: str) -> LogAnalysisOutput:
             summary = f"Found {len(relevant_logs)} relevant log entry(s). Please review the provided logs."
 
         return LogAnalysisOutput(
-            query=query,
-            relevant_logs=relevant_logs,
-            summary=summary
+            query=query, relevant_logs=relevant_logs, summary=summary
         )
     except Exception as e:
         # This can happen if the DB doesn't exist yet
         return LogAnalysisOutput(
             query=query,
             relevant_logs=[],
-            summary=f"Error analyzing logs: {e}. Please ensure the log database has been created by running 'scripts/ingest_logs.py'."
+            summary=f"Error analyzing logs: {e}. Please ensure the log database has been created by running 'scripts/ingest_logs.py'.",
         )

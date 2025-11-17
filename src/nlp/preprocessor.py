@@ -2,11 +2,13 @@
 NLP Pre-processing Layer using spaCy for fast, local, and deterministic
 Intent Classification and Named Entity Recognition.
 """
+
 import spacy
 from spacy.matcher import Matcher, PhraseMatcher
 from typing import List, Dict
 from src.core.models import UserIntent, ExtractedEntities
-from src.tools.inventory import network_manager # Import to get the device list
+from src.tools.inventory import network_manager  # Import to get the device list
+
 
 class NLPPreprocessor:
     def __init__(self):
@@ -14,14 +16,43 @@ class NLPPreprocessor:
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError:
-            print("spaCy model not found. Please run: python -m spacy download en_core_web_sm")
+            print(
+                "spaCy model not found. Please run: python -m spacy download en_core_web_sm"
+            )
             raise
 
         self.intent_rules: Dict[str, List[str]] = {
-            "get_status": ["show", "what is", "check", "display", "status", "version", "uptime"],
-            "get_config": ["config", "configuration", "running-config", "startup-config"],
+            "get_status": [
+                "show",
+                "what is",
+                "check",
+                "display",
+                "status",
+                "version",
+                "uptime",
+                "interface",
+                "vlan",
+                "interface brief",
+            ],
+            "get_config": [
+                "config",
+                "configuration",
+                "running-config",
+                "startup-config",
+            ],
             "find_device": ["find", "list", "search", "which devices", "all devices"],
-            "troubleshoot_history": ["history", "log", "logs", "past", "error", "errors", "flap", "flaps", "yesterday", "last night"],
+            "troubleshoot_history": [
+                "history",
+                "log",
+                "logs",
+                "past",
+                "error",
+                "errors",
+                "flap",
+                "flaps",
+                "yesterday",
+                "last night",
+            ],
             "greeting": ["hello", "hi", "hey", "greetings"],
         }
 
@@ -40,7 +71,13 @@ class NLPPreprocessor:
         keyword_patterns = [self.nlp.make_doc(k) for k in keywords]
         self.phrase_matcher.add("KEYWORD", keyword_patterns)
 
-        interface_pattern = [{"TEXT": {"REGEX": r"([Gg]i|[Ff]a|[Ee]th|[Tt]en)[a-zA-Z]*\d+([/]\d+)*([.]\d+)?"}}]
+        interface_pattern = [
+            {
+                "TEXT": {
+                    "REGEX": r"([Gg]i|[Ff]a|[Ee]th|[Tt]en)[a-zA-Z]*\d+([/]\d+)*([.]\d+)?"
+                }
+            }
+        ]
         self.matcher.add("INTERFACE", [interface_pattern])
 
     def _classify_intent(self, doc) -> str:
@@ -52,7 +89,9 @@ class NLPPreprocessor:
 
     def _extract_entities(self, doc) -> ExtractedEntities:
         matches = self.matcher(doc) + self.phrase_matcher(doc)
-        entities = ExtractedEntities(device_names=[], interfaces=[], protocols=[], keywords=[])
+        entities = ExtractedEntities(
+            device_names=[], interfaces=[], protocols=[], keywords=[]
+        )
 
         for match_id, start, end in matches:
             span = doc[start:end]
@@ -62,9 +101,14 @@ class NLPPreprocessor:
                 entities.device_names.append(span.text)
             elif entity_label == "INTERFACE" and span.text not in entities.interfaces:
                 entities.interfaces.append(span.text)
-            elif entity_label == "PROTOCOL" and span.text.lower() not in entities.protocols:
+            elif (
+                entity_label == "PROTOCOL"
+                and span.text.lower() not in entities.protocols
+            ):
                 entities.protocols.append(span.text.lower())
-            elif entity_label == "KEYWORD" and span.text.lower() not in entities.keywords:
+            elif (
+                entity_label == "KEYWORD" and span.text.lower() not in entities.keywords
+            ):
                 entities.keywords.append(span.text.lower())
 
         return entities
@@ -73,9 +117,19 @@ class NLPPreprocessor:
         doc = self.nlp(query)
         intent = self._classify_intent(doc)
         entities = self._extract_entities(doc)
-        is_ambiguous = (intent in ["get_status", "get_config"] and not entities.device_names)
-        sentiment = "urgent" if "urgent" in query.lower() or "down" in query.lower() else "normal"
+        is_ambiguous = (
+            intent in ["get_status", "get_config"] and not entities.device_names
+        )
+        sentiment = (
+            "urgent"
+            if "urgent" in query.lower() or "down" in query.lower()
+            else "normal"
+        )
 
         return UserIntent(
-            query=query, intent=intent, entities=entities, sentiment=sentiment, is_ambiguous=is_ambiguous
+            query=query,
+            intent=intent,
+            entities=entities,
+            sentiment=sentiment,
+            is_ambiguous=is_ambiguous,
         )

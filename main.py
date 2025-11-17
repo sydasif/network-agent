@@ -1,4 +1,5 @@
 """Main entry point for the AI Network Agent V3."""
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -6,6 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from src.graph.workflow import NetworkWorkflow
 from src.nlp.preprocessor import NLPPreprocessor
 from src.tools.inventory import network_manager
+
 
 def main():
     """Initializes and runs the NLP-First multi-agent network co-pilot."""
@@ -24,7 +26,9 @@ def main():
     print(f"📦 Inventory loaded: {len(network_manager.devices)} devices found.")
 
     if not Path("./syslogs.db").exists():
-        print("⚠️ Syslog database not found. Run 'python scripts/ingest_logs.py' to create it.")
+        print(
+            "⚠️ Syslog database not found. Run 'python scripts/ingest_logs.py' to create it."
+        )
 
     try:
         nlp_processor = NLPPreprocessor()
@@ -34,7 +38,9 @@ def main():
         print(f"❌ Error during initialization: {e}")
         return
 
-    print("\n💡 Ask complex questions like 'show interfaces on S1 and check for recent flaps'")
+    print(
+        "\n💡 Ask complex questions like 'show interfaces on S1 and check for recent flaps'"
+    )
     print("   Type 'quit' or 'exit' to end the session.")
     print("=" * 60)
 
@@ -54,7 +60,9 @@ def main():
         try:
             # 1. NLP Pre-processing
             structured_intent = nlp_processor.process(question)
-            print(f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.model_dump(exclude_none=True)}")
+            print(
+                f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.model_dump(exclude_none=True)}"
+            )
 
             # 2. Intelligent Routing
             if structured_intent.is_ambiguous:
@@ -62,7 +70,9 @@ def main():
             elif structured_intent.intent == "greeting":
                 response = "Hello! How can I help you with the network today?"
             elif structured_intent.intent == "unknown":
-                response = "I'm not sure how to handle that request. Please try rephrasing."
+                response = (
+                    "I'm not sure how to handle that request. Please try rephrasing."
+                )
             else:
                 # 3. Execute Agentic Workflow
                 response = workflow.run(structured_intent, chat_history)
@@ -76,6 +86,7 @@ def main():
 
     network_manager.close_all_sessions()
     print("\n👋 All network sessions closed. Goodbye!")
+
 
 if __name__ == "__main__":
     main()

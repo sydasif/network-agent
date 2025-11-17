@@ -1,4 +1,5 @@
 """Tool for searching the network device inventory."""
+
 from typing import List
 from langchain_core.tools import tool
 from src.core.models import DeviceInfo
@@ -6,6 +7,7 @@ from src.core.network_manager import NetworkManager
 
 # Initialize a single NetworkManager instance to be shared by tools
 network_manager = NetworkManager("inventory.yaml")
+
 
 @tool
 def inventory_search(device_name: str = "") -> List[DeviceInfo]:

@@ -1,4 +1,5 @@
 """One-time script to process and ingest syslogs into SQLite database."""
+
 import sqlite3
 import re
 
@@ -6,13 +7,14 @@ import re
 LOG_FILE_PATH = "./syslogs.log"
 DB_PATH = "./syslogs.db"
 
+
 def parse_log_line(line):
     """Parse a syslog line to extract components."""
     if not line.strip():
         return None, None, line.strip()
 
     # Extract timestamp, device, and message
-    match = re.match(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\w+)\s+(.*)', line)
+    match = re.match(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\w+)\s+(.*)", line)
     if match:
         timestamp = match.group(1)
         device_name = match.group(2)
@@ -21,6 +23,7 @@ def parse_log_line(line):
     else:
         # If the line doesn't match our expected format, store as is
         return None, None, line.strip()
+
 
 def main():
     """Loads and ingests logs into SQLite database with FTS."""
@@ -57,7 +60,7 @@ def main():
     print("Cleared existing log data.")
 
     # Read and process log file
-    with open(LOG_FILE_PATH, 'r') as f:
+    with open(LOG_FILE_PATH, "r") as f:
         log_lines = f.readlines()
 
     print(f"Loaded {len(log_lines)} log entries from {LOG_FILE_PATH}")
@@ -70,10 +73,13 @@ def main():
 
         timestamp, device_name, log_message = parse_log_line(line)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO syslog (timestamp, device_name, log_message, log_entry)
             VALUES (?, ?, ?, ?)
-        """, (timestamp, device_name, log_message, line))
+        """,
+            (timestamp, device_name, log_message, line),
+        )
 
     print(f"Inserted {len(log_lines)} entries into the database.")
 
@@ -86,6 +92,7 @@ def main():
     conn.close()
     print("✅ Ingestion complete!")
     print(f"SQLite log database created at: {DB_PATH}")
+
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,9 @@
 """Tool for executing network commands."""
+
 from langchain_core.tools import tool
 from src.core.models import CommandOutput
-from src.tools.inventory import network_manager # Reuse the same instance
+from src.tools.inventory import network_manager  # Reuse the same instance
+
 
 @tool
 def run_network_command(device_name: str, command: str) -> CommandOutput:

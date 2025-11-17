@@ -1,13 +1,16 @@
 """Core module for managing network device connections and commands."""
+
 import re
 from typing import Dict, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import yaml
 from netmiko import ConnectHandler
+
 
 @dataclass
 class Device:
     """Represents a network device with connection details."""
+
     name: str
     hostname: str
     username: str
@@ -17,8 +20,10 @@ class Device:
     role: str = ""
     connection_protocol: str = "netmiko"
 
+
 class NetworkManager:
     """Manages inventory, connections, and command execution for network devices."""
+
     def __init__(self, inventory_file: str = "inventory.yaml"):
         self.inventory_file = inventory_file
         self.devices: Dict[str, Device] = self._load_inventory()
@@ -51,15 +56,18 @@ class NetworkManager:
 
         if device.connection_protocol == "netmiko":
             return self._execute_netmiko_command(device, command)
-        elif device.connection_protocol == "gnmi":
+        if device.connection_protocol == "gnmi":
             return self._execute_gnmi_get(device, command)
-        else:
-            raise NotImplementedError(f"Protocol '{device.connection_protocol}' is not supported.")
+        raise NotImplementedError(
+            f"Protocol '{device.connection_protocol}' is not supported."
+        )
 
     def _execute_netmiko_command(self, device: Device, command: str) -> str:
         """Executes a command using Netmiko (CLI/SSH)."""
         if self._is_dangerous_command(command):
-            raise ValueError(f"Execution blocked for potentially dangerous command: {command}")
+            raise ValueError(
+                f"Execution blocked for potentially dangerous command: {command}"
+            )
 
         if device.name not in self.sessions:
             self.sessions[device.name] = ConnectHandler(
@@ -84,16 +92,26 @@ class NetworkManager:
 
     def _is_dangerous_command(self, command: str) -> bool:
         """Checks for potentially harmful commands."""
-        dangerous_patterns = [r"write\s+erase", r"reload", r"delete", r"format", r"configure\s+terminal"]
+        dangerous_patterns = [
+            r"write\s+erase",
+            r"reload",
+            r"delete",
+            r"format",
+            r"configure\s+terminal",
+        ]
         command_lower = command.lower().strip()
         return any(re.search(pattern, command_lower) for pattern in dangerous_patterns)
 
     def _sanitize_output(self, output: str) -> str:
         """Removes sensitive information from CLI output."""
         # Simplified for brevity; a production version would be more robust.
-        output = re.sub(r"password\s+\S+", "password [REDACTED]", output, flags=re.IGNORECASE)
-        output = re.sub(r"secret\s+\S+", "secret [REDACTED]", output, flags=re.IGNORECASE)
-        return output
+        result = re.sub(
+            r"password\s+\S+", "password [REDACTED]", output, flags=re.IGNORECASE
+        )
+        result = re.sub(
+            r"secret\s+\S+", "secret [REDACTED]", result, flags=re.IGNORECASE
+        )
+        return result
 
     def close_all_sessions(self):
         """Closes all active Netmiko sessions."""

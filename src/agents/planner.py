@@ -1,4 +1,5 @@
 """Defines the Planner Agent's prompt for the LangGraph workflow."""
+
 from langchain_core.prompts import ChatPromptTemplate
 
 PLANNER_PROMPT = """
@@ -19,6 +20,13 @@ Convert the structured intent into a concrete plan of tool calls.
 2.  Your job is to create the plan, not to second-guess the intent.
 3.  Choose the correct tool for each step: `inventory_search`, `run_network_command`, `analyze_logs`.
 4.  If the intent requires multiple pieces of information (e.g., live status AND historical logs), create a multi-step plan.
+5.  NEVER provide generic help text or explanations about how to run commands manually.
+6.  ALWAYS generate specific tool calls to execute the requested action.
+7.  For "get_status" or "get_config" intents, use `run_network_command` with appropriate commands based on the user's request.
+8.  Map common queries to appropriate CLI commands:
+    - "show vlan", "show vlans" -> "show vlan"
+    - "interface brief", "show interfaces" -> "show ip interface brief" or "show interface status"
+    - "status", "show", "config" -> determine appropriate show command based on context
 
 **Example:**
 Structured Intent:
@@ -45,6 +53,7 @@ Your Plan:
 
 Now, create a plan for the provided structured intent.
 """
+
 
 def get_planner_prompt():
     """Creates the planner agent prompt component."""

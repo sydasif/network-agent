@@ -1,4 +1,5 @@
 """Defines the Tool Executor for the LangGraph workflow."""
+
 from typing import List, Dict, Any
 from src.tools.inventory import inventory_search
 from src.tools.executor import run_network_command
@@ -10,6 +11,7 @@ TOOLS = {
     "run_network_command": run_network_command,
     "analyze_logs": analyze_logs,
 }
+
 
 def tool_executor(plan: List[Dict[str, Any]]) -> List[Any]:
     """
