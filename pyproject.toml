@@ -15,6 +15,7 @@ dependencies = [
     "langchain-community>=0.2.0", # For text splitters and other utilities
     # New dependency for V3
     "spacy>=3.7.0",
+    "typer>=0.20.0",
 ]
 
 [dependency-groups]
