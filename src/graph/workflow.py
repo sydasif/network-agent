@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph, END
 from src.agents.planner import get_planner_prompt
 from src.agents.executor import tool_executor
 from src.core.models import UserIntent
+from src.core.config import settings
 
 
 class AgentState(TypedDict):
@@ -24,7 +25,9 @@ class AgentState(TypedDict):
 class NetworkWorkflow:
     def __init__(self, api_key: str):
         self.llm = ChatGroq(
-            groq_api_key=api_key, model_name="llama-3.1-8b-instant", temperature=0.0
+            groq_api_key=api_key,
+            model_name=settings.groq_model_name,
+            temperature=settings.groq_temperature
         )
         self.graph = self._build_graph()
 

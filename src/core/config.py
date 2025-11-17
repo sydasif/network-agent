@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     """Loads settings from .env file or environment variables."""
     inventory_file: str = "inventory.yaml"
     spacy_model: str = "en_core_web_sm"
+    groq_model_name: str = "llama-3.1-8b-instant"
+    groq_temperature: float = 0.0
+    groq_api_key: str = ""
 
     class Config:
         env_file = ".env"

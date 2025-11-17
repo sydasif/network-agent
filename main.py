@@ -21,7 +21,7 @@ def chat():
     print("🤖 AI Network Agent V3 - Interactive Chat")
     print("=" * 60)
 
-    groq_api_key = os.getenv("GROQ_API_KEY")
+    groq_api_key = os.getenv("GROQ_API_KEY") or settings.groq_api_key
     if not groq_api_key:
         print("⚠️ GROQ_API_KEY not set! Please create a .env file with your key.")
         return
