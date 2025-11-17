@@ -1163,8 +1163,8 @@ wheels = [
 ]
 
 [[package]]
-name = "network-agent-v3"
-version = "3.0.0"
+name = "network-agent"
+version = "4.0.0"
 source = { virtual = "." }
 dependencies = [
     { name = "groq" },
@@ -1180,6 +1180,11 @@ dependencies = [
     { name = "pyyaml" },
     { name = "spacy" },
     { name = "typer" },
+]
+
+[package.optional-dependencies]
+nlp-models = [
+    { name = "spacy", extra = ["lookups"] },
 ]
 
 [package.dev-dependencies]
@@ -1201,8 +1206,10 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "spacy", specifier = ">=3.7.0" },
+    { name = "spacy", extras = ["lookups"], marker = "extra == 'nlp-models'" },
     { name = "typer", specifier = ">=0.20.0" },
 ]
+provides-extras = ["nlp-models"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.14.5" }]
@@ -1869,6 +1876,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1f/11/ebb6de686806da6d8b774a132aa33d422bf9ca4dade2a85f7b6f756286b0/spacy-3.8.9-cp313-cp313-win_amd64.whl", hash = "sha256:fcae3e5a378003172b5cab0a3631cf98a0c1b158655949262859a4fae780ca2d", size = 14212317, upload-time = "2025-11-13T14:59:05.94Z" },
 ]
 
+[package.optional-dependencies]
+lookups = [
+    { name = "spacy-lookups-data" },
+]
+
 [[package]]
 name = "spacy-legacy"
 version = "3.0.12"
@@ -1885,6 +1897,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/67/3d/926db774c9c98acf66cb4ed7faf6c377746f3e00b84b700d0868b95d0712/spacy-loggers-1.0.5.tar.gz", hash = "sha256:d60b0bdbf915a60e516cc2e653baeff946f0cfc461b452d11a4d5458c6fe5f24", size = 20811, upload-time = "2023-09-11T12:26:52.323Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/78/d1a1a026ef3af911159398c939b1509d5c36fe524c7b644f34a5146c4e16/spacy_loggers-1.0.5-py3-none-any.whl", hash = "sha256:196284c9c446cc0cdb944005384270d775fdeaf4f494d8e269466cfa497ef645", size = 22343, upload-time = "2023-09-11T12:26:50.586Z" },
+]
+
+[[package]]
+name = "spacy-lookups-data"
+version = "1.0.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/42/b747618ec64be73023b84c9eed7a09f5a345f514f367369b863f6a1dbf4f/spacy_lookups_data-1.0.5.tar.gz", hash = "sha256:6f935c81f145bdcc84fc6115f648764285c7ff3e8ff246295046814e96dad63c", size = 98442761, upload-time = "2023-07-28T12:01:14.833Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/9e/dae3acaacc7cbe8140acb181e09b9920f8b3ee81d2f1cd838d160c78f0c2/spacy_lookups_data-1.0.5-py2.py3-none-any.whl", hash = "sha256:466f21f087e4144bc93800679437ec5a17be7d0888734b1ba880b3ecb0978bc6", size = 98458367, upload-time = "2023-07-28T12:01:09.513Z" },
 ]
 
 [[package]]

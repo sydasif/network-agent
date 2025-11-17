@@ -1,4 +1,4 @@
-"""Main entry point for the AI Network Agent V3 using Typer for a clean CLI."""
+"""Main entry point for the AI Network Agent using Typer for a clean CLI."""
 import os
 from pathlib import Path
 import typer
@@ -11,14 +11,14 @@ from src.core.config import settings
 
 
 # Create a Typer app
-app = typer.Typer(help="AI Network Agent V3 - NLP-First Co-pilot")
+app = typer.Typer(help="AI Network Agent - NLP-First Co-pilot")
 
 
 @app.command()
 def chat():
     """Starts an interactive chat session with the network agent."""
     load_dotenv()
-    print("🤖 AI Network Agent V3 - Interactive Chat")
+    print("🤖 AI Network Agent - Interactive Chat")
     print("=" * 60)
 
     groq_api_key = os.getenv("GROQ_API_KEY") or settings.groq_api_key

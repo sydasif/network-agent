@@ -1,6 +1,6 @@
 [project]
-name = "network-agent-v3"
-version = "3.0.0"
+name = "network-agent"
+version = "4.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "groq>=0.33.0",
@@ -13,7 +13,7 @@ dependencies = [
     "pyyaml>=6.0",
     # New dependencies for V2
     "langchain-community>=0.2.0", # For text splitters and other utilities
-    # New dependency for V3
+    # New dependency for enhanced NLP processing
     "spacy>=3.7.0",
     "typer>=0.20.0",
     "pydantic-settings>=2.12.0",
@@ -24,6 +24,9 @@ dependencies = [
 dev = [
     "ruff>=0.14.5",
 ]
+
+[project.optional-dependencies]
+nlp-models = ["spacy[lookups]"]
 
 [tool.ruff]
 line-length = 88

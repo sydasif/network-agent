@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Welcome to Version 3 of the AI Network Agent, a production-ready, AI-powered co-pilot designed to bridge the gap between natural language and complex network operations. This version introduces a sophisticated, local-first NLP layer for faster, more reliable, and more intelligent interactions.
+Welcome to the AI Network Agent, a production-ready, AI-powered co-pilot designed to bridge the gap between natural language and complex network operations. This version introduces a sophisticated, local-first NLP layer for faster, more reliable, and more intelligent interactions.
 
 This project is the culmination of extensive research into modern AI agent architectures, built with a focus on reliability, maintainability, and real-world applicability.
 
@@ -16,9 +16,9 @@ This project is the culmination of extensive research into modern AI agent archi
 - **🔌 Multi-Protocol Ready:** The core `NetworkManager` is designed to support modern protocols like gNMI alongside traditional CLI/SSH via Netmiko.
 - **🛡️ Built-in Security:** Includes guardrails to block potentially dangerous commands and sanitize sensitive information from outputs.
 
-## 🏗️ V3 Architecture: Understand, Then Plan
+## 🏗️ Architecture: Understand, Then Plan
 
-The core of V3 is a new **NLP-First** architecture. Every user query goes through a deterministic, spaCy-powered pre-processing step before any AI reasoning is invoked. This makes the system faster, cheaper, and more reliable.
+The core is a new **NLP-First** architecture. Every user query goes through a deterministic, spaCy-powered pre-processing step before any AI reasoning is invoked. This makes the system faster, cheaper, and more reliable.
 
 **Data Flow:**
 
@@ -61,7 +61,7 @@ The core of V3 is a new **NLP-First** architecture. Every user query goes throug
 
 ## 🚀 Getting Started
 
-Follow these steps to get the AI Network Agent V3 running on your local machine.
+Follow these steps to get the AI Network Agent running on your local machine.
 
 ### 1. Prerequisites
 
@@ -87,6 +87,12 @@ Run this command once to download the required spaCy model for the NLP layer.
 
 ```bash
 python -m spacy download en_core_web_sm
+```
+
+Alternatively, you can install the model as an optional dependency:
+
+```bash
+pip install .[nlp-models]
 ```
 
 ### 4. Set Up Environment
