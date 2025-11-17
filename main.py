@@ -31,10 +31,6 @@ def chat():
         return
     print(f"📦 Inventory loaded: {len(network_manager.devices)} devices found.")
 
-    if not Path(settings.log_database_file).exists():
-        print(
-            f"⚠️ Syslog database not found. Run 'python main.py ingest-logs' to create it."
-        )
 
     try:
         nlp_processor = NLPPreprocessor()
@@ -45,7 +41,7 @@ def chat():
         return
 
     print(
-        "\n💡 Ask complex questions like 'show interfaces on S1 and check for recent flaps'"
+        "\n💡 Ask complex questions like 'show interfaces on S1' or 'show running config on R1'"
     )
     print("   Type 'quit' or 'exit' to end the session.")
     print("=" * 60)
@@ -94,19 +90,6 @@ def chat():
     print("\n👋 All network sessions closed. Goodbye!")
 
 
-@app.command()
-def ingest_logs():
-    """Processes syslogs.log and ingests them into the SQLite database."""
-    typer.echo("Starting log ingestion process...")
-    try:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("ingest_logs", "scripts/ingest_logs.py")
-        ingest_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ingest_module)
-        ingest_module.main()
-        typer.echo(typer.style("✅ Log ingestion complete!", fg=typer.colors.GREEN))
-    except Exception as e:
-        typer.echo(typer.style(f"❌ Error during log ingestion: {e}", fg=typer.colors.RED))
 
 
 if __name__ == "__main__":

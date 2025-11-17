@@ -5,8 +5,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Loads settings from .env file or environment variables."""
     inventory_file: str = "inventory.yaml"
-    log_database_file: str = "syslogs.db"
-    log_source_file: str = "syslogs.log"
     spacy_model: str = "en_core_web_sm"
 
     class Config:

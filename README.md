@@ -12,7 +12,6 @@ This project is the culmination of extensive research into modern AI agent archi
 - **🧠 Intelligent Routing:** Simple greetings or ambiguous questions are handled immediately without engaging the full AI workflow, saving time and resources.
 - **🔗 Multi-Agent Workflow (LangGraph):** A robust Planner/Executor agent team, orchestrated by LangGraph, decomposes and executes complex, multi-step tasks.
 - **📄 Structured Data Contracts (Pydantic):** All tools and agents communicate using reliable Pydantic models, ensuring data consistency and predictable behavior.
-- **🔍 Log Analysis with SQLite FTS:** A specialized tool uses a local SQLite database with Full-Text Search (FTS) to rapidly answer questions about historical syslogs, removing the need for external embedding models.
 - **💬 Conversational Memory:** The agent remembers the context of your conversation, allowing for natural follow-up questions.
 - **🔌 Multi-Protocol Ready:** The core `NetworkManager` is designed to support modern protocols like gNMI alongside traditional CLI/SSH via Netmiko.
 - **🛡️ Built-in Security:** Includes guardrails to block potentially dangerous commands and sanitize sensitive information from outputs.
@@ -43,8 +42,6 @@ The core of V3 is a new **NLP-First** architecture. Every user query goes throug
 ├── main.py
 ├── pyproject.toml
 ├── README.md
-├── scripts
-│   └── ingest_logs.py
 ├── src
 │   ├── agents
 │   │   ├── executor.py
@@ -59,9 +56,7 @@ The core of V3 is a new **NLP-First** architecture. Every user query goes throug
 │   │   └── preprocessor.py
 │   └── tools
 │       ├── executor.py
-│       ├── inventory.py
-│       └── log_analyzer.py
-└── syslogs.log
+│       └── inventory.py
 ```
 
 ## 🚀 Getting Started
@@ -127,13 +122,6 @@ devices:
     connection_protocol: netmiko
 ```
 
-### 6. Build Log Database
-
-Add your historical syslog data to the `syslogs.log` file. Then, run the ingestion script once to create the searchable SQLite database.
-
-```bash
-python main.py ingest-logs
-```
 
 ## 💻 Usage
 
@@ -154,22 +142,13 @@ Once the agent is running, you can ask it questions in natural language.
 - `list all devices`
 - `show me the vlans on S1`
 - `what is the status of the interfaces on R1?`
-- `check for BGP flaps on R1 and show me its version` (multi-step query)
-- `were there any critical errors yesterday?` (log analysis)
-
-### Re-ingest Logs
-
-If you update the `syslogs.log` file, you can rebuild the database at any time with the `ingest-logs` command.
-
-```bash
-python main.py ingest-logs
-```
+- `show me the running config on R1`
 
 ## 🛠️ Core Components Explained
 
 - `src/nlp/preprocessor.py`: The heart of the NLP-First architecture. Uses spaCy to convert raw text into a structured `UserIntent`.
 - `src/graph/workflow.py`: The LangGraph-based multi-agent system that orchestrates planning and execution.
-- `src/tools/`: Contains the individual capabilities of the agent (inventory search, command execution, log analysis).
+- `src/tools/`: Contains the individual capabilities of the agent (inventory search, command execution).
 - `src/core/`: Provides the foundational building blocks:
   - `config.py`: Centralized application settings.
   - `models.py`: Pydantic data models that act as contracts between all components.

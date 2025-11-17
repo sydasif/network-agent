@@ -31,18 +31,6 @@ class CommandOutput(BaseModel):
     )
 
 
-class LogAnalysisOutput(BaseModel):
-    """Structured output for a log analysis query."""
-
-    query: str = Field(..., description="The original user query for the logs.")
-    relevant_logs: List[str] = Field(
-        ..., description="A list of the most relevant log entries found."
-    )
-    summary: str = Field(
-        ..., description="A brief summary of the findings from the logs."
-    )
-
-
 # --- NLP Pre-processing Models ---
 
 
@@ -71,7 +59,7 @@ class UserIntent(BaseModel):
         "get_status",
         "get_config",
         "find_device",
-        "troubleshoot_history",
+        "troubleshoot",
         "greeting",
         "unknown",
     ] = Field(..., description="The primary goal of the user.")

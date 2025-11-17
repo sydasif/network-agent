@@ -18,12 +18,11 @@ Convert the structured intent into a concrete plan of tool calls.
 **Rules:**
 1.  Use the `intent` and `entities` from the structured input to create your plan.
 2.  Your job is to create the plan, not to second-guess the intent.
-3.  Choose the correct tool for each step: `inventory_search`, `run_network_command`, `analyze_logs`.
-4.  If the intent requires multiple pieces of information (e.g., live status AND historical logs), create a multi-step plan.
-5.  NEVER provide generic help text or explanations about how to run commands manually.
-6.  ALWAYS generate specific tool calls to execute the requested action.
-7.  For "get_status" or "get_config" intents, use `run_network_command` with appropriate commands based on the user's request.
-8.  Map common queries to appropriate CLI commands:
+3.  Choose the correct tool for each step: `inventory_search`, `run_network_command`.
+4.  NEVER provide generic help text or explanations about how to run commands manually.
+5.  ALWAYS generate specific tool calls to execute the requested action.
+6.  For "get_status" or "get_config" intents, use `run_network_command` with appropriate commands based on the user's request.
+7.  Map common queries to appropriate CLI commands:
     - "show vlan", "show vlans" -> "show vlan"
     - "interface brief", "show interfaces" -> "show ip interface brief" or "show interface status"
     - "status", "show", "config" -> determine appropriate show command based on context
@@ -31,9 +30,9 @@ Convert the structured intent into a concrete plan of tool calls.
 **Example:**
 Structured Intent:
 {{
-  "query": "show interfaces on S1 and check for flaps",
-  "intent": "troubleshoot_history",
-  "entities": {{ "device_names": ["S1"], "keywords": ["flaps"] }}
+  "query": "show interfaces on S1",
+  "intent": "get_status",
+  "entities": {{ "device_names": ["S1"] }}
 }}
 
 Your Plan:
@@ -42,13 +41,9 @@ Your Plan:
     {{
       "tool": "run_network_command",
       "args": {{"device_name": "S1", "command": "show ip interface brief"}}
-    }},
-    {{
-      "tool": "analyze_logs",
-      "args": {{"query": "interface flaps on device S1"}}
     }}
   ],
-  "reasoning": "The user wants to see the current interface status on S1 and check for historical flaps. I will use `run_network_command` for the live status and `analyze_logs` for the history."
+  "reasoning": "The user wants to see the interface status on S1. I will use `run_network_command` to retrieve this information."
 }}
 
 Now, create a plan for the provided structured intent.

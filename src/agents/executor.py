@@ -3,13 +3,11 @@
 from typing import List, Dict, Any
 from src.tools.inventory import inventory_search
 from src.tools.executor import run_network_command
-from src.tools.log_analyzer import analyze_logs
 
 # Map tool names to their functions
 TOOLS = {
     "inventory_search": inventory_search,
     "run_network_command": run_network_command,
-    "analyze_logs": analyze_logs,
 }
 
 
