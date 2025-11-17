@@ -1,25 +1,28 @@
 # AI Network Agent - Simplified 3-Tool Architecture
 
-This is a simplified network automation agent that uses a 3-tool architecture for maximum reliability and maintainability.
+This is a simplified network automation agent that uses a 3-tool architecture with a consolidated device management system for maximum reliability and maintainability.
 
 ## Architecture Overview
 
-The application follows a clean, simplified architecture with only 3 tools:
+The application follows a clean, simplified architecture with only 3 tools and a consolidated core module:
 
 ### Tools
+
 1. **inventory.py** - Handles device listing and searching
 2. **executor.py** - Main pipeline for executing network commands
 3. **parser.py** - Parses and formats CLI output
 
-### Core Modules
-- **inventory.py** - Manages network device inventory from YAML file
-- **device_manager.py** - Handles device connections and sessions
-- **command_executor.py** - Executes commands on network devices
-- **validation.py** - Validates and sanitizes network commands
-- **device_router.py** - Routes queries to appropriate devices
-- **sensitive_data.py** - Sanitizes sensitive information from output
+### Core Module
+
+- **network_manager.py** - Consolidated network management (replaces multiple modules)
+  - Device inventory loading from YAML file
+  - Connection/session management
+  - Command execution
+  - Security validation (dangerous command detection)
+  - Output sanitization
 
 ### Agent
+
 - **main_agent.py** - Single agent that orchestrates the 3 tools
 
 ## Features
@@ -29,6 +32,7 @@ The application follows a clean, simplified architecture with only 3 tools:
 - Safe command validation and execution
 - Sensitive data sanitization
 - Multi-device support
+- Simplified architecture with reduced complexity
 
 ## Setup
 
@@ -40,7 +44,8 @@ The application follows a clean, simplified architecture with only 3 tools:
 ## Usage
 
 Once started, you can ask questions like:
-- "show version on S1" 
+
+- "show version on S1"
 - "list all devices"
 - "show interfaces on S2"
 
@@ -55,14 +60,18 @@ src/
  ├ agent/
  │    └ main_agent.py
  ├ core/
- │    ├ device_manager.py
- │    ├ command_executor.py
- │    ├ validation.py
- │    ├ device_router.py
- │    └ sensitive_data.py
+ │    └ network_manager.py (consolidated functionality)
  ├ inventory.yaml
  └ main.py
 ```
+
+## Simplification Benefits
+
+- **Reduced complexity**: Single NetworkManager class consolidates functionality
+- **Easier maintenance**: Fewer files and components to maintain
+- **More predictable behavior**: Explicit device and command parameters
+- **Same security**: All dangerous command detection and output sanitization preserved
+- **Cleaner code**: Removed unnecessary layers of abstraction
 
 ## Prerequisites
 

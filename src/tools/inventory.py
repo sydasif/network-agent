@@ -1,15 +1,17 @@
 """Inventory tool for network devices."""
 
+from typing import Optional
+
 from langchain_core.tools import tool
 
-from src.core.inventory import InventoryManager
+from src.core.network_manager import NetworkManager
 
 
-inv = InventoryManager("inventory.yaml")
+network_manager = NetworkManager("inventory.yaml")
 
 
 @tool
-def inventory_search(query: str) -> str:
+def inventory_search(device_name: Optional[str] = None) -> str:
     """
     Search for devices or list all devices in the inventory.
 
@@ -18,48 +20,34 @@ def inventory_search(query: str) -> str:
     - Search for a specific device by name
     - Get information about devices
 
-    Examples:
-    - "list devices" → Returns all devices
-    - "find D1" → Returns information about D1
-    - "show me all switches" → Returns all devices
-
     Args:
-        query: Natural language query about devices
+        device_name: Name of specific device to search for (optional, if None returns all devices)
 
     Returns:
         Device information in human-readable format
     """
-    query_lower = query.lower()
-
-    # Check if user wants to list all devices
-    if any(keyword in query_lower for keyword in ["list", "all", "show devices"]):
-        devices = inv.list_devices()
-        if not devices:
-            return "No devices found in inventory."
-
-        result = "Available devices:\n"
-        result += "\n".join(
-            [
-                f"  • {d.name} ({d.hostname}) - {d.device_type} - {d.description}"
-                for d in devices
-            ]
-        )
-        return result
-
-    # Otherwise, search for specific device
-    # Extract potential device name from query
-    words = query.split()
-    for word in words:
-        dev = inv.find_device_by_name(word)
-        if dev:
+    if device_name:
+        # Search for specific device
+        device = network_manager.get_device(device_name)
+        if device:
             return (
-                f"Device: {dev.name}\n"
-                f"Hostname: {dev.hostname}\n"
-                f"Type: {dev.device_type}\n"
-                f"Description: {dev.description}\n"
-                f"Role: {dev.role}"
+                f"Device: {device.name}\n"
+                f"Hostname: {device.hostname}\n"
+                f"Type: {device.device_type}\n"
+                f"Description: {device.description}\n"
+                f"Role: {device.role}"
             )
+        available_devices = list(network_manager.devices.keys())
+        return f"Device '{device_name}' not found. Available devices: {', '.join(available_devices) if available_devices else 'None'}"
+    # List all devices
+    if not network_manager.devices:
+        return "No devices found in inventory."
 
-    return f"No device found matching '{query}'. Available devices: " + ", ".join(
-        [d.name for d in inv.list_devices()]
+    result = "Available devices:\n"
+    result += "\n".join(
+        [
+            f"  • {d.name} ({d.hostname}) - {d.device_type} - {d.description}"
+            for d in network_manager.devices.values()
+        ]
     )
+    return result

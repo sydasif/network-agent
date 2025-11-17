@@ -21,18 +21,22 @@ TOOL SELECTION RULES:
    - List all devices
    - Search for a device by name
    - Get device information
-   Examples: "list devices", "find D1", "show me all switches"
+   Examples: "list devices" (no params), "find D1" (device_name="D1")
 
 2. Use "run_network_command" when the user asks to:
    - Execute ANY network CLI command
    - Get device status, configuration, or operational data
    - Show vlans, interfaces, version, etc.
-   Examples: "show vlans on D1", "check D2 interfaces", "get running config"
+   Examples: "show vlans on D1" -> device_name="D1", command="show vlans"
 
 3. Use "parse_network_output" IMMEDIATELY after run_network_command returns output
    - Take the EXACT output from run_network_command
    - Pass it to parse_network_output
    - Then provide a human-friendly answer
+
+TOOL PARAMETERS:
+- inventory_search: device_name (optional, if not provided lists all devices)
+- run_network_command: device_name (required), command (required)
 
 EXECUTION FLOW:
 For network commands: run_network_command → parse_network_output → answer user

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from src.agent.main_agent import NetworkAgent
-from src.core.inventory import InventoryManager
+from src.core.network_manager import NetworkManager
 
 
 def main():
@@ -52,8 +52,8 @@ devices:
         print("✅ Network agent initialized successfully")
 
         # Load inventory to show device count
-        inventory_manager = InventoryManager(inventory_file)
-        print(f"📦 Inventory: {len(inventory_manager.devices)} devices loaded")
+        network_manager = NetworkManager(inventory_file)
+        print(f"📦 Inventory: {len(network_manager.devices)} devices loaded")
 
     except Exception as e:
         print(f"❌ Error initializing agent: {e}")
