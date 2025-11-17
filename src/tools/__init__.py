@@ -1,1 +1,1 @@
-"""Tools package for LangChain agent integration."""
+"""Package initialization for tools."""

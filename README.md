@@ -1,233 +1,72 @@
-# AI Network Agent - Simplified Network Automation
+# AI Network Agent - Simplified 3-Tool Architecture
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/your-repo/network-agent)
-[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)](htmlcov/)
+This is a simplified network automation agent that uses a 3-tool architecture for maximum reliability and maintainability.
 
-A streamlined, AI-powered agent that enables natural language interaction with network devices. Built with security and simplicity in mind.
+## Architecture Overview
 
-## 🎯 What It Does
+The application follows a clean, simplified architecture with only 3 tools:
 
-Ask questions about your network in plain English:
-
-```text
-💬 "Show me all interfaces and their status"
-💬 "What's the device uptime?"
-💬 "Which interfaces have errors?"
-```
-
-The AI agent will understand your question, execute appropriate commands, and provide clear answers.
-
-## ✨ What's New in v0.2.0
-
-- 🏗️ **Simplified Architecture** - Reduced from 1200 to ~800 lines
-- 🚨 **Exception-Based Errors** - Pythonic error handling
-- 📝 **Professional Logging** - Configurable structured logging
-- 🎯 **Production Prompt** - 300+ line system prompt
-- 📦 **Type-Safe Models** - Dataclasses for domain objects
-- ✅ **Improved Tests** - 80%+ coverage with integration tests
-
-## 📋 Prerequisites
-
-- Python 3.12+
-- `uv` package manager (recommended). Install with `pip install uv`.
-- Groq API key (free at <https://console.groq.com/keys>)
-- Network device with SSH access (Cisco IOS)
-
-## 📦 Installation
-
-```bash
-# Clone repository
-git clone https://github.com/your-repo/network-agent.git
-cd network-agent
-
-# Install with uv (recommended)
-uv venv
-source .venv/bin/activate  # Linux/macOS
-uv pip install .
-
-# Or install with pip
-pip install -e .
-```
-
-### 3. Configure Environment
-
-Create `.env` file:
-
-```bash
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-### 4. Run
-
-```bash
-uv run main.py
-```
-
-## 📁 Project Structure
-
-```bash
-network-agent/
-├── main.py                 # Entry point
-├── src/                    # Application modules
-│   ├── __init__.py
-│   ├── agent.py           # AI agent logic
-│   ├── audit.py           # Audit logging
-│   ├── health.py          # Health check functionality
-│   ├── interface.py       # User interface
-│   ├── network_device.py  # Device connection
-│   ├── sensitive_data.py  # Sensitive data protection
-│   ├── settings.py        # Configuration
-│   └── security.py        # Command security policy
-├── tests/                 # Test files
-├── pyproject.toml         # Project dependencies
-├── .env                   # Environment secrets
-└── README.md              # This file
-```
-
-## 🏗️ Simplified Architecture
-
-Following the refactoring plan, the architecture has been significantly simplified:
+### Tools
+1. **inventory.py** - Handles device listing and searching
+2. **executor.py** - Main pipeline for executing network commands
+3. **parser.py** - Parses and formats CLI output
 
 ### Core Modules
+- **inventory.py** - Manages network device inventory from YAML file
+- **device_manager.py** - Handles device connections and sessions
+- **command_executor.py** - Executes commands on network devices
+- **validation.py** - Validates and sanitizes network commands
+- **device_router.py** - Routes queries to appropriate devices
+- **sensitive_data.py** - Sanitizes sensitive information from output
 
-| Module | Class | Responsibility |
-|--------|-------|-----------------|
-| `agent.py` | `Agent` | LLM integration and command orchestration |
-| `network_device.py` | `DeviceConnection` | SSH connection and command execution |
-| `security.py` | `CommandSecurityPolicy` | Command validation and security checks |
-| `sensitive_data.py` | `SensitiveDataProtector` | Data sanitization and protection |
-| `audit.py` | `AuditLogger` | Security logging and events |
-| `settings.py` | `Settings` | Centralized configuration |
-| `interface.py` | `UserInterface` | Interactive CLI interface |
+### Agent
+- **main_agent.py** - Single agent that orchestrates the 3 tools
 
-### Removed Complexity
+## Features
 
-Per the refactoring plan, the following features were removed to simplify the architecture:
+- Natural language interface for network device management
+- Device inventory management from YAML file
+- Safe command validation and execution
+- Sensitive data sanitization
+- Multi-device support
 
-- Model fallback chain
-- Local rate limiting
-- Command history tracking
-- Statistics tracking
-- Special commands (except quit)
-- Complex reconnection logic
-- Metrics dashboard from core
-- Overly complex configuration layers
+## Setup
 
-## 💬 Example Usage
+1. Install dependencies with `uv sync`
+2. Set up your `inventory.yaml` file with device information
+3. Set your GROQ_API_KEY environment variable
+4. Run with `python main.py`
 
-```bash
-$ uv run main.py
+## Usage
 
-============================================================
-AI Network Agent
-============================================================
+Once started, you can ask questions like:
+- "show version on S1" 
+- "list all devices"
+- "show interfaces on S2"
 
-Device IP: 192.168.1.1
-Username: admin
-Password: ****
-✓ Connected to 192.168.1.1
+## File Structure
 
-============================================================
-Ready! Type 'quit' to exit
-============================================================
-
-💬 Ask: Show me all interfaces
-
-------------------------------------------------------------
-GigabitEthernet0/0 is up, line protocol is up
-Hardware is iGbE, address is 0011.2233.4455
-
-GigabitEthernet0/1 is up, line protocol is up
-Hardware is iGbE, address is 0011.2233.4456
-
-GigabitEthernet0/2 is down, line protocol is down
-
-Loopback0 is up, line protocol is up
-------------------------------------------------------------
-
-💬 Ask: quit
-✓ Disconnected
-
-📝 Audit logs saved to: logs/audit_YYYYMMDD_HHMMSS.log
+```
+src/
+ ├ tools/
+ │    ├ inventory.py
+ │    ├ executor.py
+ │    └ parser.py
+ ├ agent/
+ │    └ main_agent.py
+ ├ core/
+ │    ├ device_manager.py
+ │    ├ command_executor.py
+ │    ├ validation.py
+ │    ├ device_router.py
+ │    └ sensitive_data.py
+ ├ inventory.yaml
+ └ main.py
 ```
 
-## 🔧 Technical Stack
+## Prerequisites
 
-- **Python 3.12+** — Modern Python with type hints
-- **LangChain** — LLM orchestration framework
-- **Netmiko** — Network device communication
-- **Pydantic** — Type-safe configuration management
-- **Groq** — Fast LLM inference API
-- **pytest** — Testing framework
-
-## 🔒 Security Features
-
-This application implements several security measures:
-
-### **Read-Only by Design** 🔒
-
-- Only `show`, `display`, and `get` commands are allowed
-- Dangerous commands like `reload`, `write`, `configure` are blocked
-- Command validation with whitelist + blacklist protection
-- Command chaining protection (blocks `;`, allows safe pipes only)
-
-### **Prompt Injection Defense** 🛡️
-
-- Length limits (configurable in settings)
-- Suspicious pattern detection and blocking
-- Query sanitization for malicious content
-
-### **Sensitive Data Protection** 🔐
-
-- Password/API key automatic sanitization
-- Automatic redaction in logs and error messages
-- Configurable sensitive data patterns
-
-### **Secure Configuration**
-
-- Environment-based configuration
-- API keys never stored in code
-- Secure credential handling
-
-## 🧪 Testing
-
-Run the test suite to ensure everything is working:
-
-```bash
-# Run all tests
-uv run pytest tests/
-
-# Run tests with verbose output
-uv run pytest tests/ -v
-
-# Run specific test file
-uv run pytest tests/test_security.py
-```
-
-## 🎯 Use Cases
-
-- **Network Troubleshooting** — Quick diagnostics without CLI hunting
-- **Health Checks** — Regular device status verification
-- **Training** — Learn networking concepts interactively
-- **Documentation** — AI-generated device reports
-
-## ✅ What's Supported
-
-- ✅ Cisco IOS devices (routers and switches)
-- ✅ SSH connections with username/password
-- ✅ Show commands (read-only)
-- ✅ Natural language queries
-- ✅ Secure command execution
-- ✅ Audit logging
-
-## ❌ What's Not Supported
-
-- ❌ Configuration changes (by design - security first)
-- ❌ Non-Cisco devices (currently)
-- ❌ Telnet connections (SSH only)
-
----
-
-**Happy Automating!** 🚀🤖
+- Python 3.12+
+- uv package manager
+- GROQ API key
+- Network devices accessible via SSH/TELNET
