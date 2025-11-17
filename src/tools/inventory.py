@@ -4,9 +4,10 @@ from typing import List
 from langchain_core.tools import tool
 from src.core.models import DeviceInfo
 from src.core.network_manager import NetworkManager
+from src.core.config import settings
 
 # Initialize a single NetworkManager instance to be shared by tools
-network_manager = NetworkManager("inventory.yaml")
+network_manager = NetworkManager(settings.inventory_file)
 
 
 @tool

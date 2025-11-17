@@ -8,16 +8,17 @@ from spacy.matcher import Matcher, PhraseMatcher
 from typing import List, Dict
 from src.core.models import UserIntent, ExtractedEntities
 from src.tools.inventory import network_manager  # Import to get the device list
+from src.core.config import settings
 
 
 class NLPPreprocessor:
     def __init__(self):
         """Initializes the spaCy model, matchers, and intent rules."""
         try:
-            self.nlp = spacy.load("en_core_web_sm")
+            self.nlp = spacy.load(settings.spacy_model)
         except OSError:
             print(
-                "spaCy model not found. Please run: python -m spacy download en_core_web_sm"
+                f"spaCy model not found. Please run: python -m spacy download {settings.spacy_model}"
             )
             raise
 

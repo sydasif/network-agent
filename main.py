@@ -1,18 +1,24 @@
-"""Main entry point for the AI Network Agent V3."""
-
+"""Main entry point for the AI Network Agent V3 using Typer for a clean CLI."""
 import os
 from pathlib import Path
+import typer
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage
 from src.graph.workflow import NetworkWorkflow
 from src.nlp.preprocessor import NLPPreprocessor
 from src.tools.inventory import network_manager
+from src.core.config import settings
 
 
-def main():
-    """Initializes and runs the NLP-First multi-agent network co-pilot."""
+# Create a Typer app
+app = typer.Typer(help="AI Network Agent V3 - NLP-First Co-pilot")
+
+
+@app.command()
+def chat():
+    """Starts an interactive chat session with the network agent."""
     load_dotenv()
-    print("🤖 AI Network Agent V3 - NLP-First Co-pilot")
+    print("🤖 AI Network Agent V3 - Interactive Chat")
     print("=" * 60)
 
     groq_api_key = os.getenv("GROQ_API_KEY")
@@ -20,14 +26,14 @@ def main():
         print("⚠️ GROQ_API_KEY not set! Please create a .env file with your key.")
         return
 
-    if not Path("inventory.yaml").exists():
-        print("⚠️ Inventory file 'inventory.yaml' not found. Please create one.")
+    if not Path(settings.inventory_file).exists():
+        print(f"⚠️ Inventory file '{settings.inventory_file}' not found. Please create one.")
         return
     print(f"📦 Inventory loaded: {len(network_manager.devices)} devices found.")
 
-    if not Path("./syslogs.db").exists():
+    if not Path(settings.log_database_file).exists():
         print(
-            "⚠️ Syslog database not found. Run 'python scripts/ingest_logs.py' to create it."
+            f"⚠️ Syslog database not found. Run 'python main.py ingest-logs' to create it."
         )
 
     try:
@@ -88,5 +94,20 @@ def main():
     print("\n👋 All network sessions closed. Goodbye!")
 
 
+@app.command()
+def ingest_logs():
+    """Processes syslogs.log and ingests them into the SQLite database."""
+    typer.echo("Starting log ingestion process...")
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("ingest_logs", "scripts/ingest_logs.py")
+        ingest_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ingest_module)
+        ingest_module.main()
+        typer.echo(typer.style("✅ Log ingestion complete!", fg=typer.colors.GREEN))
+    except Exception as e:
+        typer.echo(typer.style(f"❌ Error during log ingestion: {e}", fg=typer.colors.RED))
+
+
 if __name__ == "__main__":
-    main()
+    app()

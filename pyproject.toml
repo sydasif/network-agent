@@ -16,6 +16,7 @@ dependencies = [
     # New dependency for V3
     "spacy>=3.7.0",
     "typer>=0.20.0",
+    "pydantic-settings>=2.12.0",
 ]
 
 [dependency-groups]

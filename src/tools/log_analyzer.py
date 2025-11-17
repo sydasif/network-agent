@@ -3,9 +3,10 @@
 import sqlite3
 from langchain_core.tools import tool
 from src.core.models import LogAnalysisOutput
+from src.core.config import settings
 
 # Setup for the log analysis tool
-DB_PATH = "./syslogs.db"
+DB_PATH = settings.log_database_file
 
 
 @tool

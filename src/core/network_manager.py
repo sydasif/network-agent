@@ -24,8 +24,9 @@ class Device:
 class NetworkManager:
     """Manages inventory, connections, and command execution for network devices."""
 
-    def __init__(self, inventory_file: str = "inventory.yaml"):
-        self.inventory_file = inventory_file
+    def __init__(self, inventory_file: str = None):
+        from src.core.config import settings
+        self.inventory_file = inventory_file or settings.inventory_file
         self.devices: Dict[str, Device] = self._load_inventory()
         self.sessions: Dict[str, ConnectHandler] = {}
 

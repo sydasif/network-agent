@@ -1,11 +1,14 @@
 """One-time script to process and ingest syslogs into SQLite database."""
 
-import sqlite3
 import re
+import sqlite3
+
+from src.core.config import settings
+
 
 # Configuration
-LOG_FILE_PATH = "./syslogs.log"
-DB_PATH = "./syslogs.db"
+LOG_FILE_PATH = settings.log_source_file
+DB_PATH = settings.log_database_file
 
 
 def parse_log_line(line):
@@ -20,9 +23,8 @@ def parse_log_line(line):
         device_name = match.group(2)
         log_message = match.group(3)
         return timestamp, device_name, log_message
-    else:
-        # If the line doesn't match our expected format, store as is
-        return None, None, line.strip()
+    # If the line doesn't match our expected format, store as is
+    return None, None, line.strip()
 
 
 def main():
