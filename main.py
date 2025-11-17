@@ -54,7 +54,7 @@ def main():
         try:
             # 1. NLP Pre-processing
             structured_intent = nlp_processor.process(question)
-            print(f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.dict(exclude_none=True)}")
+            print(f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.model_dump(exclude_none=True)}")
 
             # 2. Intelligent Routing
             if structured_intent.is_ambiguous:
