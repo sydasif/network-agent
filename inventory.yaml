@@ -28,7 +28,7 @@ devices:
     connection_protocol: netmiko
 
   - name: S2
-    hostname: 192.168.121.103
+    hostname: 192.168.121.104
     username: admin
     password: admin
     device_type: cisco_ios
