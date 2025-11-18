@@ -105,6 +105,18 @@ def chat():
     print("\n👋 All network sessions closed. Goodbye!")
 
 
+# Cache health checks to avoid file re-reading
+_cached_health_checks = None
+
+def _get_cached_health_checks():
+    """Caches the health checks to avoid repeated file I/O operations."""
+    global _cached_health_checks
+    if _cached_health_checks is None:
+        with open("command.yaml", "r") as f:
+            _cached_health_checks = yaml.safe_load(f).get("health_checks", [])
+    return _cached_health_checks
+
+
 @app.command()
 def analyze():
     """Runs a single, on-demand health analysis across all devices.
@@ -126,8 +138,7 @@ def analyze():
     state_manager = StateManager()
     analyzer = ProactiveAnalyzer(api_key=groq_api_key)
 
-    with open("command.yaml", "r") as f:
-        health_checks = yaml.safe_load(f).get("health_checks", [])
+    health_checks = _get_cached_health_checks()
 
     if not health_checks:
         print("❌ No health checks defined in command.yaml. Exiting.")

@@ -11,6 +11,7 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 import yaml
 from netmiko import ConnectHandler
+import functools
 
 
 @dataclass
@@ -175,6 +176,15 @@ class NetworkManager:
             f"gNMI not implemented. Attempted to query {device.name} with path: {xpath}"
         )
 
+    # Cache compiled regex patterns to avoid recompilation
+    _DANGEROUS_PATTERNS_COMPILED = [
+        re.compile(r"write\s+erase", re.IGNORECASE),
+        re.compile(r"reload", re.IGNORECASE),
+        re.compile(r"delete", re.IGNORECASE),
+        re.compile(r"format", re.IGNORECASE),
+        re.compile(r"configure\s+terminal", re.IGNORECASE),
+    ]
+
     def _is_dangerous_command(self, command: str) -> bool:
         """Checks for potentially harmful commands.
 
@@ -186,15 +196,8 @@ class NetworkManager:
         Returns:
             bool: True if the command is dangerous, False otherwise.
         """
-        dangerous_patterns = [
-            r"write\s+erase",
-            r"reload",
-            r"delete",
-            r"format",
-            r"configure\s+terminal",
-        ]
         command_lower = command.lower().strip()
-        return any(re.search(pattern, command_lower) for pattern in dangerous_patterns)
+        return any(pattern.search(command_lower) for pattern in self._DANGEROUS_PATTERNS_COMPILED)
 
     def _sanitize_output(self, output: str) -> str:
         """Removes sensitive information from CLI output.

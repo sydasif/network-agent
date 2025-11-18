@@ -95,9 +95,9 @@ class NLPPreprocessor:
         # --- Add static matchers that are always needed ---
         self.matcher = Matcher(self.nlp.vocab)
 
-        # Device names are still dynamic from the live inventory
-        device_names = list(network_manager.devices.keys())
-        device_patterns = [self.nlp.make_doc(name) for name in device_names]
+        # Device names are still dynamic from the live inventory, cache them to avoid repeated lookups
+        self._device_names = list(network_manager.devices.keys())
+        device_patterns = [self.nlp.make_doc(name) for name in self._device_names]
         self.phrase_matcher.add("DEVICE", device_patterns)
 
         # Interface patterns are regex-based and remain static
