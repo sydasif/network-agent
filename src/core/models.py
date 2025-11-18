@@ -5,8 +5,10 @@ consistent data contracts between components. The models are organized into
 tooling models and NLP pre-processing models.
 """
 
-from typing import List, Optional, Literal
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, Field
+
 
 # --- Tooling Models ---
 
@@ -97,7 +99,6 @@ class UserIntent(BaseModel):
         "get_status",
         "get_config",
         "find_device",
-        "troubleshoot",
         "greeting",
         "unknown",
     ] = Field(..., description="The primary goal of the user.")
