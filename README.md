@@ -12,7 +12,7 @@ An intelligent, NLP-powered network operations co-pilot designed to bridge the g
 - **🧠 Multi-Agent Workflow:** Planner/Executor agent team orchestrated by LangGraph for complex, multi-step network diagnostics.
 - **📄 Structured Data Contracts:** Pydantic models ensure consistent communication between all components.
 - **💬 Conversational Interface:** Natural language interaction with conversational memory for follow-up questions.
-- **🔌 Multi-Protocol Support:** Designed to support both traditional CLI/SSH and modern network protocols like gNMI.
+- **🔌 Protocol Support:** Supports traditional CLI/SSH commands via Netmiko for comprehensive device management.
 - **🛡️ Built-in Security:** Command filtering and output sanitization to prevent dangerous operations.
 - **📈 On-Demand Health Analysis:** Proactively analyzes device health by comparing current state to the last known state, using an LLM to identify significant changes.
 
@@ -90,7 +90,6 @@ devices:
     username: admin
     password: password
     device_type: cisco_ios
-    connection_protocol: netmiko
     role: switch
 
   - name: R1
@@ -98,7 +97,6 @@ devices:
     username: admin
     password: password
     device_type: cisco_ios
-    connection_protocol: netmiko
     role: router
 ```
 
@@ -160,6 +158,7 @@ The analysis feature compares current device states with historical snapshots to
 
 - **Proactive Monitoring Service:** Evolve the `analyze` command into a continuously running service (daemon) that performs health checks on a schedule (e.g., every 15 minutes).
 - **Collaborative Alerting:** Integrate a notification service to push `Critical` or `Warning` findings from the analysis to platforms like Slack or Webex, turning the agent into a true team collaborator.
+- **gNMI Support:** Add support for gNMI (gRPC Network Management Interface) protocol to enable modern, programmatic network device management alongside traditional CLI/SSH methods.
 
 ## 🤝 Contributing
 

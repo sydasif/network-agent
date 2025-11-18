@@ -67,7 +67,7 @@ class ExtractedEntities(BaseModel):
     """
 
     device_names: Optional[List[str]] = Field(
-        None, description="A list of device hostnames, like ['S1', 'core-router-gnmi']"
+        None, description="A list of device hostnames, like ['S1', 'core-router']"
     )
     interfaces: Optional[List[str]] = Field(
         None, description="A list of interface names, like ['GigabitEthernet0/1']"

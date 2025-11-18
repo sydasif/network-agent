@@ -8,7 +8,6 @@ devices:
     password: admin
     device_type: cisco_ios
     role: distribution
-    connection_protocol: netmiko
 
   - name: D2
     hostname: 192.168.121.102
@@ -16,7 +15,6 @@ devices:
     password: admin
     device_type: cisco_ios
     role: distribution
-    connection_protocol: netmiko
 
   # Access Switches
   - name: S1
@@ -25,7 +23,6 @@ devices:
     password: admin
     device_type: cisco_ios
     role: access
-    connection_protocol: netmiko
 
   - name: S2
     hostname: 192.168.121.104
@@ -33,7 +30,6 @@ devices:
     password: admin
     device_type: cisco_ios
     role: access
-    connection_protocol: netmiko
 
   # - name: core-router-gnmi
   #   hostname: 10.0.0.1
@@ -42,4 +38,4 @@ devices:
   #   device_type: cisco_xr
   #   description: Core router with gNMI support
   #   role: core
-  #   connection_protocol: gnmi # Example for a modern device
+  #   # connection_protocol would be used when gNMI is implemented

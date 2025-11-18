@@ -63,47 +63,52 @@ def chat():
     print("=" * 60)
 
     chat_history = []
-    while True:
-        try:
-            question = input("\n💬 You: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            break
+    try:
+        while True:
+            try:
+                question = input("\n💬 You: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                break
 
-        if not question:
-            continue
-        if question.lower() in ["quit", "exit"]:
-            break
+            if not question:
+                continue
+            if question.lower() in ["quit", "exit"]:
+                break
 
-        print("-" * 40)
-        try:
-            # 1. NLP Pre-processing
-            structured_intent = nlp_processor.process(question)
-            print(
-                f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.model_dump(exclude_none=True)}"
-            )
-
-            # 2. Intelligent Routing
-            if structured_intent.is_ambiguous:
-                response = "I'm sorry, your request is a bit ambiguous. Could you please provide more details, like a specific device name?"
-            elif structured_intent.intent == "greeting":
-                response = "Hello! How can I help you with the network today?"
-            elif structured_intent.intent == "unknown":
-                response = (
-                    "I'm not sure how to handle that request. Please try rephrasing."
+            print("-" * 40)
+            try:
+                # 1. NLP Pre-processing
+                structured_intent = nlp_processor.process(question)
+                print(
+                    f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.model_dump(exclude_none=True)}"
                 )
-            else:
-                # 3. Execute Agentic Workflow
-                response = workflow.run(structured_intent, chat_history)
 
-            print(f"\n🤖 Agent: {response}")
-            chat_history.append(HumanMessage(content=question))
-            chat_history.append(AIMessage(content=response))
-        except Exception as e:
-            print(f"❌ An unexpected error occurred: {e}")
-        print("-" * 40)
+                # 2. Intelligent Routing
+                if structured_intent.is_ambiguous:
+                    response = "I'm sorry, your request is a bit ambiguous. Could you please provide more details, like a specific device name?"
+                elif structured_intent.intent == "greeting":
+                    response = "Hello! How can I help you with the network today?"
+                elif structured_intent.intent == "unknown":
+                    response = (
+                        "I'm not sure how to handle that request. Please try rephrasing."
+                    )
+                else:
+                    # 3. Execute Agentic Workflow
+                    response = workflow.run(structured_intent, chat_history)
 
-    network_manager.close_all_sessions()
-    print("\n👋 All network sessions closed. Goodbye!")
+                print(f"\n🤖 Agent: {response}")
+                chat_history.append(HumanMessage(content=question))
+                chat_history.append(AIMessage(content=response))
+            except KeyboardInterrupt:
+                print("\n⚠️  Operation interrupted by user. Cleaning up connections...")
+                network_manager.close_all_sessions()
+                break
+            except Exception as e:
+                print(f"❌ An unexpected error occurred: {e}")
+            print("-" * 40)
+    finally:
+        network_manager.close_all_sessions()
+        print("\n👋 All network sessions closed. Goodbye!")
 
 
 @lru_cache(maxsize=1)
@@ -143,30 +148,36 @@ def analyze():
     print(f"📈 Analyzing {len(network_manager.devices)} devices with {len(health_checks)} checks...")
     print("-" * 40)
 
-    for device in network_manager.devices.values():
-        print(f"Device: {device.name}")
-        for check in health_checks:
-            command = check["command"]
-            try:
-                current_state = {"output": network_manager.execute_command(device.name, command)}
-                previous_state = state_manager.get_latest_snapshot(device.name, command)
+    try:
+        for device in network_manager.devices.values():
+            print(f"Device: {device.name}")
+            for check in health_checks:
+                command = check["command"]
+                try:
+                    current_state = {"output": network_manager.execute_command(device.name, command)}
+                    previous_state = state_manager.get_latest_snapshot(device.name, command)
 
-                if previous_state:
-                    analysis = analyzer.analyze_change(device.name, command, previous_state, current_state)
-                    significance = analysis['significance']
-                    summary = analysis['summary']
-                    print(f"  - Check '{command}': [{significance}] {summary}")
-                else:
-                    print(f"  - Check '{command}': [Informational] First run, storing baseline state.")
+                    if previous_state:
+                        analysis = analyzer.analyze_change(device.name, command, previous_state, current_state)
+                        significance = analysis['significance']
+                        summary = analysis['summary']
+                        print(f"  - Check '{command}': [{significance}] {summary}")
+                    else:
+                        print(f"  - Check '{command}': [Informational] First run, storing baseline state.")
 
-                state_manager.save_snapshot(device.name, command, current_state)
+                    state_manager.save_snapshot(device.name, command, current_state)
 
-            except Exception as e:
-                print(f"  - Check '{command}': [Error] {e}")
-        print("-" * 40)
-
-    network_manager.close_all_sessions()
-    print("✅ Analysis complete.")
+                except KeyboardInterrupt:
+                    print("\n⚠️  Analysis interrupted by user. Cleaning up connections...")
+                    network_manager.close_all_sessions()
+                    print("❌ Analysis interrupted.")
+                    return  # Exit the function early
+                except Exception as e:
+                    print(f"  - Check '{command}': [Error] {e}")
+        print("✅ Analysis complete.")
+    finally:
+        # Ensure sessions are closed on all paths (success, error, or interrupt)
+        network_manager.close_all_sessions()
 
 
 if __name__ == "__main__":

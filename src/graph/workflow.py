@@ -146,7 +146,21 @@ class NetworkWorkflow:
                 print(f"No plan found in response: {content[:200]}...")
                 plan = []
 
-        return {"plan": plan}
+        # Process the plan to substitute interface names where needed
+        processed_plan = []
+        for step in plan:
+            if isinstance(step, dict) and "args" in step and "command" in step["args"]:
+                command = step["args"]["command"]
+                interfaces = state["input"].entities.interfaces
+
+                # If the command contains interface_name placeholder and we have interfaces
+                if "{interface_name}" in command and interfaces:
+                    # Use the first interface from the list
+                    command = command.replace("{interface_name}", interfaces[0])
+                    step["args"]["command"] = command
+            processed_plan.append(step)
+
+        return {"plan": processed_plan}
 
     def executor_node(self, state: AgentState):
         """The executor node that runs the planned tool calls.
@@ -161,9 +175,9 @@ class NetworkWorkflow:
             A dictionary containing the results of tool execution.
         """
         plan = state["plan"]
-        print(f"🔍 Executing plan: {plan}")
+        print(f"🔍 Executing plan with {len(plan)} steps...")
         results = tool_executor(plan)
-        print(f"✅ Plan execution completed, results: {len(results)} items")
+        print(f"✅ Plan execution completed with {len(results)} results")
         return {"tool_results": results}
 
     def generator_node(self, state: AgentState):
@@ -203,6 +217,12 @@ class NetworkWorkflow:
         Returns:
             str: The final response to the user's query.
         """
-        inputs = {"input": intent, "chat_history": chat_history}
-        final_state = self.graph.invoke(inputs)
-        return final_state["response"]
+        try:
+            inputs = {"input": intent, "chat_history": chat_history}
+            final_state = self.graph.invoke(inputs)
+            return final_state["response"]
+        except KeyboardInterrupt:
+            # Ensure all network sessions are closed if user interrupts the workflow
+            from src.tools.inventory import network_manager
+            network_manager.close_all_sessions()
+            raise  # Re-raise the KeyboardInterrupt to maintain the expected behavior

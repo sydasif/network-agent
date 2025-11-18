@@ -31,8 +31,11 @@ Convert the structured intent into a concrete plan of tool calls.
     - "show vlan", "show vlans" -> "show vlan"
     - "interface brief", "show interfaces" -> "show ip interface brief" or "show interface status"
     - "status", "show", "config" -> determine appropriate show command based on context
+8.  If interfaces are extracted from the query, incorporate them into the command by replacing {{interface_name}} placeholders with the actual interface names:
+    - For "show running-config interface {{interface_name}}" command, replace {{interface_name}} with the actual extracted interface name like "GigabitEthernet0/1"
+    - Use the first interface in the entities.interfaces list if multiple interfaces are provided
 
-**Example:**
+**Example 1 (No interface):**
 Structured Intent:
 {{
   "query": "show interfaces on S1",
@@ -49,6 +52,25 @@ Your Plan:
     }}
   ],
   "reasoning": "The user wants to see the interface status on S1. I will use `run_network_command` to retrieve this information."
+}}
+
+**Example 2 (With interface):**
+Structured Intent:
+{{
+  "query": "show running config on interface GigabitEthernet0/1 on S1",
+  "intent": "get_config",
+  "entities": {{ "device_names": ["S1"], "interfaces": ["GigabitEthernet0/1"] }}
+}}
+
+Your Plan:
+{{
+  "plan": [
+    {{
+      "tool": "run_network_command",
+      "args": {{"device_name": "S1", "command": "show running-config interface GigabitEthernet0/1"}}
+    }}
+  ],
+  "reasoning": "The user wants to see the running configuration for interface GigabitEthernet0/1 on S1. I will use `run_network_command` with the interface-specific command."
 }}
 
 Now, create a plan for the provided structured intent.

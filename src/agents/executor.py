@@ -6,6 +6,7 @@ between the agent workflow and the actual network tools.
 """
 
 from typing import List, Dict, Any
+from langchain_core.tools import BaseTool
 from src.tools.inventory import inventory_search
 from src.tools.executor import run_network_command
 
@@ -40,7 +41,12 @@ def tool_executor(plan: List[Dict[str, Any]]) -> List[Any]:
         if tool_name in TOOLS:
             tool_function = TOOLS[tool_name]
             try:
-                result = tool_function.invoke(tool_args)
+                # Check if the tool is a LangChain tool or a regular Python function
+                if isinstance(tool_function, BaseTool):
+                    result = tool_function.invoke(tool_args)
+                else:
+                    # For regular Python functions, call directly with the arguments
+                    result = tool_function(**tool_args)
                 results.append(result)
             except Exception as e:
                 results.append(f"Error executing tool {tool_name}: {e}")

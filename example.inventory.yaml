@@ -8,7 +8,6 @@ devices:
     password: admin
     device_type: cisco_ios
     role: distribution
-    connection_protocol: netmiko
 
   # Access Switches
   - name: S1
@@ -17,4 +16,3 @@ devices:
     password: admin
     device_type: cisco_ios
     role: access
-    connection_protocol: netmiko

@@ -186,3 +186,28 @@ class NLPPreprocessor:
         return UserIntent(
             query=query, intent=intent, entities=entities, sentiment=sentiment, is_ambiguous=is_ambiguous
         )
+
+    def refresh_device_names(self):
+        """Refreshes the device names in the NLP preprocessor when inventory changes.
+
+        This method updates the device name patterns in the phrase matcher to include
+        any new devices that have been added to the network inventory since initialization.
+        """
+        # Get the latest device names from the network manager
+        current_device_names = list(network_manager.devices.keys())
+
+        # If device names have changed, update the matcher
+        if set(current_device_names) != set(self._device_names):
+            # Remove old device patterns
+            try:
+                self.phrase_matcher.remove("DEVICE")
+            except KeyError:
+                # DEVICE pattern might not exist, which is fine
+                pass
+
+            # Update the internal list of device names
+            self._device_names = current_device_names
+
+            # Create and add new device patterns
+            device_patterns = [self.nlp.make_doc(name) for name in self._device_names]
+            self.phrase_matcher.add("DEVICE", device_patterns)

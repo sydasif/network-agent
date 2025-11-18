@@ -1,9 +1,8 @@
 """Core module for managing network device connections and commands.
 
 This module provides the NetworkManager class which handles device inventory management,
-establishes connections to network devices, and executes commands using various protocols
-like Netmiko (SSH/CLI) and gNMI (with future support). It includes safety features like
-dangerous command detection and output sanitization.
+establishes connections to network devices, and executes commands using Netmiko (SSH/CLI).
+It includes safety features like dangerous command detection and output sanitization.
 """
 
 import re
@@ -11,6 +10,7 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 import yaml
 from netmiko import ConnectHandler
+from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 import functools
 
 
@@ -29,7 +29,6 @@ class Device:
         device_type (str): Netmiko device type (e.g., 'cisco_ios', 'cisco_xr').
         description (str): Optional description of the device.
         role (str): Role of the device in the network (e.g., 'access', 'distribution').
-        connection_protocol (str): Protocol used to connect to the device ('netmiko' or 'gnmi').
     """
 
     name: str
@@ -39,7 +38,6 @@ class Device:
     device_type: str
     description: str = ""
     role: str = ""
-    connection_protocol: str = "netmiko"
 
 
 class NetworkManager:
@@ -96,10 +94,9 @@ class NetworkManager:
         return self.devices.get(device_name)
 
     def execute_command(self, device_name: str, command: str) -> str:
-        """Executes a command on a device, dispatching to the correct protocol handler.
+        """Executes a command on a device using Netmiko.
 
-        This method routes the command execution to the appropriate protocol handler
-        based on the device's connection protocol.
+        This method routes the command execution to the Netmiko protocol handler.
 
         Args:
             device_name (str): Name of the device to execute the command on.
@@ -110,19 +107,13 @@ class NetworkManager:
 
         Raises:
             ValueError: If the device is not found or command is dangerous.
-            NotImplementedError: If the protocol is not supported.
         """
         device = self.get_device(device_name)
         if not device:
             raise ValueError(f"Device '{device_name}' not found in inventory.")
 
-        if device.connection_protocol == "netmiko":
-            return self._execute_netmiko_command(device, command)
-        if device.connection_protocol == "gnmi":
-            return self._execute_gnmi_get(device, command)
-        raise NotImplementedError(
-            f"Protocol '{device.connection_protocol}' is not supported."
-        )
+        # Currently only Netmiko is supported
+        return self._execute_netmiko_command(device, command)
 
     def _execute_netmiko_command(self, device: Device, command: str) -> str:
         """Executes a command using Netmiko (CLI/SSH).
@@ -142,39 +133,29 @@ class NetworkManager:
             )
 
         if device.name not in self.sessions:
-            self.sessions[device.name] = ConnectHandler(
-                device_type=device.device_type,
-                host=device.hostname,
-                username=device.username,
-                password=device.password,
-                timeout=10,
-            )
+            try:
+                self.sessions[device.name] = ConnectHandler(
+                    device_type=device.device_type,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    timeout=10,
+                )
+            except NetmikoTimeoutException:
+                raise ValueError(f"Timeout connecting to device {device.name}")
+            except NetmikoAuthenticationException:
+                raise ValueError(f"Authentication failed for device {device.name}")
+            except Exception as e:
+                raise ValueError(f"Failed to connect to device {device.name}: {e}")
 
         session = self.sessions[device.name]
-        output = session.send_command(command, read_timeout=20)
-        return self._sanitize_output(output)
-
-    def _execute_gnmi_get(self, device: Device, xpath: str) -> str:
-        """Placeholder for executing a gNMI GET request.
-
-        This method is a placeholder demonstrating the dispatcher pattern for gNMI support.
-        In a real implementation, it would use a library like pygnmi.
-
-        Args:
-            device (Device): The device object to query.
-            xpath (str): The gNMI path to query.
-
-        Returns:
-            str: Query result (currently raises NotImplementedError).
-
-        Raises:
-            NotImplementedError: gNMI support not yet implemented.
-        """
-        # In a real implementation, you would use a library like pygnmi here.
-        # For now, this demonstrates the dispatcher pattern.
-        raise NotImplementedError(
-            f"gNMI not implemented. Attempted to query {device.name} with path: {xpath}"
-        )
+        try:
+            output = session.send_command(command, read_timeout=20)
+            return self._sanitize_output(output)
+        except NetmikoTimeoutException:
+            raise ValueError(f"Timeout executing command '{command}' on device {device.name}")
+        except Exception as e:
+            raise ValueError(f"Error executing command '{command}' on device {device.name}: {e}")
 
     # Cache compiled regex patterns to avoid recompilation
     _DANGEROUS_PATTERNS_COMPILED = [
@@ -190,8 +171,11 @@ class NetworkManager:
         re.compile(r"enable\s+secret", re.IGNORECASE),
         re.compile(r"username.*secret", re.IGNORECASE),
         re.compile(r"service.*password", re.IGNORECASE),
-        # Patterns with potential for command injection
-        re.compile(r"[;&|]", re.IGNORECASE),  # Shell command separators
+        # Patterns with potential for command injection - be more specific with shell separators
+        # Only block ; and & as dangerous, allow | as it's commonly used in network commands
+        re.compile(r"^[;&]", re.IGNORECASE),  # Shell command separators at start (excluding pipe)
+        re.compile(r"[;&][;&|]", re.IGNORECASE),  # Multiple separators starting with ; or &
+        re.compile(r"[;&]\s*[;&|]", re.IGNORECASE),  # Multiple separators with space
     ]
 
     def _is_dangerous_command(self, command: str) -> bool:
