@@ -7,12 +7,11 @@ execution plans), Tool Executor (which executes the plans), and a Generator agen
 multi-agent system to generate appropriate responses.
 """
 
-import json
-import re
 from typing import List, TypedDict
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, END
+
 from src.agents.planner import get_planner_prompt
 from src.agents.executor import tool_executor
 from src.core.models import UserIntent
@@ -27,15 +26,17 @@ class AgentState(TypedDict):
     to process user requests and maintain context.
 
     Attributes:
-        input (UserIntent): The structured input from the NLP pre-processor.
+        input (str): Raw user query
         chat_history (List[BaseMessage]): The conversation history.
+        structured_intent: The structured intent from NLP preprocessing
         plan (List[dict]): The execution plan created by the planner agent.
         tool_results (List[any]): Results from executing the plan.
         response (str): The final synthesized response to the user.
     """
 
-    input: UserIntent
+    input: str  # Raw user query
     chat_history: List[BaseMessage]
+    structured_intent: UserIntent # The structured output
     plan: List[dict]
     tool_results: List[dict]
     response: str
@@ -64,30 +65,70 @@ class NetworkWorkflow:
         self.llm = ChatGroq(
             groq_api_key=api_key,
             model_name=settings.groq_model_name,
-            temperature=settings.groq_temperature
+            temperature=0
         )
+
+        # --- THE MAGIC HAPPENS HERE ---
+        # This creates a specialized LLM that ONLY outputs your Pydantic model.
+        # It handles the prompt, the schema, and the validation automatically.
+        self.intent_classifier = self.llm.with_structured_output(UserIntent)
+
         self.graph = self._build_graph()
 
     def _build_graph(self):
-        """Builds the LangGraph workflow with planner, executor, and generator nodes.
+        """Builds the LangGraph workflow with preprocessor, planner, executor, and generator nodes.
 
-        Creates a state graph with three nodes that process the request in sequence:
-        1. Planner node creates an execution plan
-        2. Executor node executes the plan
-        3. Generator node synthesizes the final response
+        Creates a state graph with four nodes that process the request in sequence:
+        1. Preprocessor node classifies intent and extracts entities
+        2. Planner node creates an execution plan
+        3. Executor node executes the plan
+        4. Generator node synthesizes the final response
 
         Returns:
             The compiled LangGraph workflow.
         """
         workflow = StateGraph(AgentState)
+        workflow.add_node("preprocessor", self.preprocessor_node)
         workflow.add_node("planner", self.planner_node)
         workflow.add_node("executor", self.executor_node)
         workflow.add_node("generator", self.generator_node)
-        workflow.set_entry_point("planner")
-        workflow.add_edge("planner", "executor")
+
+        workflow.set_entry_point("preprocessor") # Start here
+
+        workflow.add_edge("preprocessor", "planner")
+
+        # Conditional edge from planner - if there's a response, go directly to END, otherwise proceed with execution
+        workflow.add_conditional_edges(
+            "planner",
+            self._should_continue,
+            {
+                "continue": "executor",
+                "end": END
+            }
+        )
+
         workflow.add_edge("executor", "generator")
         workflow.add_edge("generator", END)
         return workflow.compile()
+
+    def _should_continue(self, state):
+        """Determine whether to continue with executor/generator nodes or end early."""
+        # If there's already a response in the state, we should end early
+        if state.get("response"):
+            return "end"
+        return "continue"
+
+    def preprocessor_node(self, state: AgentState):
+        """Classify intent using the structured LLM."""
+        print(f"🔍 Analyzing: {state['input']}")
+
+        # One line to do all the NLP work
+        intent = self.intent_classifier.invoke(state['input'])
+
+        # Optional: Simple logic to inject available devices if needed for context
+        # (The LLM usually figures it out, but you can add context to the prompt if needed)
+
+        return {"structured_intent": intent}
 
     def planner_node(self, state: AgentState):
         """The planner node that creates an execution plan from the user intent.
@@ -106,10 +147,19 @@ class NetworkWorkflow:
         Returns:
             A dictionary containing the generated plan.
         """
+        # Access the structured intent instead of the raw input
+        intent = state["structured_intent"]
+
+        # Quick routing checks based on intent - return early for simple queries
+        if intent.intent == "greeting":
+            return {"response": "Hello! I'm your network assistant. How can I help?", "plan": []}
+        if intent.is_ambiguous:
+            return {"response": "Could you please specify which device you are referring to?", "plan": []}
+
         prompt = get_planner_prompt()
         planner_chain = prompt | self.llm
         # Convert to JSON string for the prompt as expected by the template
-        input_json = state["input"].model_dump_json(indent=2)
+        input_json = intent.model_dump_json(indent=2)
         response = planner_chain.invoke(
             {"input": input_json, "chat_history": state["chat_history"]}
         )
@@ -151,9 +201,9 @@ class NetworkWorkflow:
         for step in plan:
             if isinstance(step, dict) and "args" in step and "command" in step["args"]:
                 command = step["args"]["command"]
-                interfaces = state["input"].entities.interfaces
-                vlans = state["input"].entities.vlans
-                ip_addresses = state["input"].entities.ip_addresses
+                interfaces = intent.entities.interfaces
+                vlans = intent.entities.vlans
+                ip_addresses = intent.entities.ip_addresses
 
                 # If the command contains interface_name placeholder and we have interfaces
                 if "{interface_name}" in command and interfaces:
@@ -208,7 +258,7 @@ class NetworkWorkflow:
         """
         # Construct the context for the LLM with user query, execution plan, and results
         context = f"""
-        User's Original Question: {state["input"].query}
+        User's Original Question: {state["input"]}
         Your Plan: {state["plan"]}
         Results of Executing Plan: {[res.model_dump() if hasattr(res, "model_dump") else res for res in state["tool_results"]]}
 
@@ -219,20 +269,21 @@ class NetworkWorkflow:
         response = self.llm.invoke(context)
         return {"response": response.content}
 
-    def run(self, intent: UserIntent, chat_history: List[BaseMessage]):
-        """Runs the workflow with the given intent and chat history.
+    def run(self, query: str, chat_history: List[BaseMessage]):
+        """Runs the workflow with the given query and chat history.
 
-        Executes the full workflow to process a user's intent and return a response.
+        Executes the full workflow to process a user's query and return a response.
 
         Args:
-            intent (UserIntent): The structured intent from the NLP pre-processor.
+            query (str): The raw user query in natural language.
             chat_history (List[BaseMessage]): The conversation history.
 
         Returns:
             str: The final response to the user's query.
         """
         try:
-            inputs = {"input": intent, "chat_history": chat_history}
+            # Note: The input needs to be the raw query for the preprocessor node
+            inputs = {"input": query, "chat_history": chat_history}
             final_state = self.graph.invoke(inputs)
             return final_state["response"]
         except KeyboardInterrupt:

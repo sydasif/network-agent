@@ -18,8 +18,6 @@ dependencies = [
     # Security vulnerabilities addressed through code-level mitigations
     "langchain-community>=0.2.19,<0.3.0",
     "langchain-text-splitters>=0.2.2,<0.3.0",
-    # New dependency for enhanced NLP processing
-    "spacy>=3.7.0",
     "typer>=0.20.0",
     "pydantic-settings>=2.12.0",
     "pip>=25.3",
@@ -30,9 +28,6 @@ dependencies = [
 dev = [
     "ruff>=0.14.5",
 ]
-
-[project.optional-dependencies]
-nlp-models = ["spacy[lookups]"]
 
 [tool.ruff]
 line-length = 88

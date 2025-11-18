@@ -10,7 +10,7 @@ from src.core.config import settings
 
 def start_server(host: str = "0.0.0.0", port: int = 8000):
     """Start the FastAPI server.
-    
+
     Args:
         host (str): Host address to bind the server to
         port (int): Port number to bind the server to
@@ -28,10 +28,9 @@ if __name__ == "__main__":
     # Get host and port from environment variables if available
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8000"))
-    
+
     print(f"🚀 Starting AI Network Agent API server on {host}:{port}")
     print(f"📖 Inventory file: {settings.inventory_file}")
-    print(f"🤖 Spacy model: {settings.spacy_model}")
     print(f"🧠 Groq model: {settings.groq_model_name}")
-    
+
     start_server(host=host, port=port)

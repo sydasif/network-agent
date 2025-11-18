@@ -8,7 +8,7 @@ An intelligent, NLP-powered network operations co-pilot designed to bridge the g
 
 ## ✨ Key Features
 
-- **⚡ NLP-First Architecture:** Local spaCy NLP pre-processor instantly classifies user intent and extracts entities (devices, interfaces, protocols) for faster, more reliable interactions.
+- **⚡ NLP-First Architecture:** Uses LLM's structured output for instant classification of user intent and extraction of entities (devices, interfaces, protocols) for faster, more reliable interactions.
 - **🧠 Multi-Agent Workflow:** Planner/Executor agent team orchestrated by LangGraph for complex, multi-step network diagnostics.
 - **📄 Structured Data Contracts:** Pydantic models ensure consistent communication between all components.
 - **💬 Conversational Interface:** Natural language interaction with conversational memory for follow-up questions.
@@ -21,14 +21,15 @@ An intelligent, NLP-powered network operations co-pilot designed to bridge the g
 The agent uses a **NLP-First** architecture that processes queries through a deterministic pre-processing step before engaging the AI workflow:
 
 ```
-[User Input] -> [spaCy NLP Pre-processor] -> [Structured Intent] -> [Intelligent Router] -> [LangGraph Workflow] -> [Response]
+[User Input] -> [LLM Structured Output] -> [Structured Intent] -> [Intelligent Router] -> [LangGraph Workflow] -> [Response]
 ```
 
 ### Core Components:
 
-1. **NLP Pre-processor** - Extracts intent and entities using local spaCy model
+1. **LLM Structured Output** - Extracts intent and entities using LLM's native tool-calling capabilities
 2. **Intelligent Router** - Handles simple queries and routes complex ones to the workflow
 3. **LangGraph Workflow** - Multi-agent system:
+   - Preprocessor Node: Uses LLM to classify intent and extract entities
    - Planner Agent: Creates execution plans from structured intents
    - Executor Agent: Runs network commands and tools
    - Generator Node: Synthesizes results into responses
@@ -37,7 +38,6 @@ The agent uses a **NLP-First** architecture that processes queries through a det
 
 ```
 .
-├── command.yaml          # NLP command mappings and keywords
 ├── inventory.yaml        # Network device inventory
 ├── main.py              # CLI entry point
 ├── pyproject.toml       # Project dependencies
@@ -46,7 +46,6 @@ The agent uses a **NLP-First** architecture that processes queries through a det
     ├── agents/          # LangGraph agents (planner, executor)
     ├── core/            # Core models and network manager
     ├── graph/           # LangGraph workflow
-    ├── nlp/             # NLP preprocessor
     └── tools/           # Network tools
 ```
 
@@ -71,12 +70,7 @@ cd nlp-network-agent
 uv sync
 ```
 
-3. Install required NLP model:
-```bash
-python -m spacy download en_core_web_sm
-```
-
-4. Set up environment:
+3. Set up environment:
 Create a `.env` file in the project root:
 ```
 GROQ_API_KEY="your_groq_api_key"
@@ -128,14 +122,13 @@ uv run python main.py analyze
 - **src.core.config**: Centralized configuration settings using Pydantic Settings
 - **src.core.network_manager**: Manages inventory, connections, and command execution for network devices
 - **src.core.state_manager**: Manages persistent storage of device state snapshots using SQLite
-- **src.nlp.preprocessor**: NLP pre-processor for classifying user intent and extracting entities
-- **src.graph.workflow**: Implements the main LangGraph workflow with Planner, Executor, and Generator nodes
+- **src.graph.workflow**: Implements the main LangGraph workflow with Preprocessor, Planner, Executor, and Generator nodes
 - **src.agents**: Contains specific agent implementations (planner, executor, analyzer)
 - **src.tools**: Provides LangChain tools for inventory search and network command execution
 
 ### Data Flow
 
-1. **Input Processing**: User queries are processed by the NLP preprocessor which returns structured intent containing:
+1. **Input Processing**: User queries are processed by the LLM's structured output feature which returns structured intent containing:
    - Query intent (get_status, get_config, find_device, etc.)
    - Extracted entities (device names, interfaces, protocols)
    - Sentiment analysis and ambiguity detection

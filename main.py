@@ -14,7 +14,6 @@ import yaml
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage
 from src.graph.workflow import NetworkWorkflow
-from src.nlp.preprocessor import NLPPreprocessor
 from src.tools.inventory import network_manager
 from src.core.config import settings
 from src.core.state_manager import StateManager
@@ -30,9 +29,9 @@ app = typer.Typer(help="AI Network Agent - NLP-First Co-pilot")
 def chat():
     """Starts an interactive chat session with the network agent.
 
-    This command initializes the NLP preprocessor and network workflow,
+    This command initializes the network workflow,
     then enters an interactive loop to process user queries. The process
-    involves NLP preprocessing, intent classification, and execution of
+    involves LLM-based preprocessing, intent classification, and execution of
     the appropriate agent workflow to generate responses.
     """
     load_dotenv()
@@ -51,7 +50,6 @@ def chat():
 
 
     try:
-        nlp_processor = NLPPreprocessor()
         workflow = NetworkWorkflow(api_key=groq_api_key)
         print("✅ NLP layer and Agent workflow initialized successfully.")
     except Exception as e:
@@ -79,24 +77,8 @@ def chat():
 
             print("-" * 40)
             try:
-                # 1. NLP Pre-processing
-                structured_intent = nlp_processor.process(question)
-                print(
-                    f"🔍 Intent: {structured_intent.intent} | Entities: {structured_intent.entities.model_dump(exclude_none=True)}"
-                )
-
-                # 2. Intelligent Routing
-                if structured_intent.is_ambiguous:
-                    response = "I'm sorry, your request is a bit ambiguous. Could you please provide more details, like a specific device name?"
-                elif structured_intent.intent == "greeting":
-                    response = "Hello! How can I help you with the network today?"
-                elif structured_intent.intent == "unknown":
-                    response = (
-                        "I'm not sure how to handle that request. Please try rephrasing."
-                    )
-                else:
-                    # 3. Execute Agentic Workflow
-                    response = workflow.run(structured_intent, chat_history)
+                # Execute Agentic Workflow with raw query (the workflow now handles NLP internally)
+                response = workflow.run(question, chat_history)
 
                 print(f"\n🤖 Agent: {response}")
                 chat_history.append(HumanMessage(content=question))
@@ -115,9 +97,15 @@ def chat():
 
 @lru_cache(maxsize=1)
 def _get_cached_health_checks():
-    """Caches the health checks to avoid repeated file I/O operations."""
-    with open("command.yaml", "r") as f:
-        return yaml.safe_load(f).get("health_checks", [])
+    """Caches the health checks to avoid repeated operations."""
+    # Default set of health checks that were previously in command.yaml
+    return [
+        {"command": "show version", "description": "Device version and status"},
+        {"command": "show interfaces", "description": "Interface status and statistics"},
+        {"command": "show ip route", "description": "Routing table information"},
+        {"command": "show processes cpu", "description": "CPU utilization"},
+        {"command": "show memory", "description": "Memory utilization"}
+    ]
 
 
 @app.command()
@@ -125,7 +113,7 @@ def analyze():
     """Runs a single, on-demand health analysis across all devices.
 
     This command performs proactive health analysis by comparing current device
-    states with previously stored snapshots. It executes a series of predefined
+    states with previously stored snapshots. It executes a series of default
     health check commands and uses an LLM to analyze changes and determine
     their operational significance (Critical, Warning, or Informational).
     """
@@ -144,7 +132,7 @@ def analyze():
     health_checks = _get_cached_health_checks()
 
     if not health_checks:
-        print("❌ No health checks defined in command.yaml. Exiting.")
+        print("❌ No health checks defined. Exiting.")
         return
 
     print(f"📈 Analyzing {len(network_manager.devices)} devices with {len(health_checks)} checks...")
@@ -187,8 +175,7 @@ def monitor(interval: int = 900):
     """Starts the continuous health monitoring service.
 
     This command starts a daemon process that continuously monitors network devices
-    according to the health checks defined in command.yaml, running checks at the
-    specified interval.
+    according to the default health checks, running checks at the specified interval.
 
     Args:
         interval (int): Interval between health checks in seconds (default: 900 = 15min)

@@ -16,7 +16,6 @@ class Settings(BaseSettings):
 
     Attributes:
         inventory_file (str): Path to the inventory YAML file containing device information.
-        spacy_model (str): Name of the spaCy model to use for NLP processing.
         groq_model_name (str): Name of the LLM model to use with Groq API.
         groq_temperature (float): Temperature setting for the LLM (controls randomness).
         groq_api_key (str): API key for Groq service (can be empty if provided via environment).
@@ -24,7 +23,6 @@ class Settings(BaseSettings):
     """
 
     inventory_file: str = "inventory.yaml"
-    spacy_model: str = "en_core_web_sm"
     groq_model_name: str = "llama-3.1-8b-instant"  # Updated to a current model
     groq_temperature: float = 0.7
     groq_api_key: str = ""
@@ -33,7 +31,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"  # This allows extra environment variables
+        extra="ignore",  # This allows extra environment variables
     )
 
 

@@ -12,21 +12,19 @@ from src.core.network_manager import NetworkManager
 from src.agents.analyzer import ProactiveAnalyzer
 from src.core.config import settings
 from src.core.state_manager import StateManager
-import yaml
-import os
 
 
 class HealthMonitor:
     """Background service for continuous health monitoring of network devices.
-    
+
     This service runs in a separate thread, periodically checking device health
     and analyzing changes using the ProactiveAnalyzer. It can be started and
     stopped gracefully.
     """
-    
+
     def __init__(self, api_key: str):
         """Initializes the health monitor with required components.
-        
+
         Args:
             api_key (str): The Groq API key for the analyzer
         """
@@ -34,25 +32,29 @@ class HealthMonitor:
         self.network_manager = NetworkManager(settings.inventory_file)
         self.analyzer = ProactiveAnalyzer(api_key=api_key)
         self.state_manager = StateManager()
-        
-        # Load health checks from command.yaml
-        with open("command.yaml", "r") as f:
-            config = yaml.safe_load(f)
-            self.health_checks = config.get("health_checks", [])
-    
+
+        # Define default health checks since we removed command.yaml
+        self.health_checks = [
+            {"command": "show version", "description": "Device version and status"},
+            {"command": "show interfaces", "description": "Interface status and statistics"},
+            {"command": "show ip route", "description": "Routing table information"},
+            {"command": "show processes cpu", "description": "CPU utilization"},
+            {"command": "show memory", "description": "Memory utilization"}
+        ]
+
     def start_monitoring(self, interval: int = 900):  # Default to 15 minutes
         """Starts the health monitoring service in a background thread.
-        
+
         Args:
             interval (int): Interval between health checks in seconds (default: 900s = 15min)
         """
         monitor_thread = threading.Thread(target=self._monitor_loop, args=(interval,), daemon=True)
         monitor_thread.start()
         print(f"✅ Health monitor started, checking every {interval} seconds")
-    
+
     def _monitor_loop(self, interval: int):
         """Main monitoring loop that runs in the background thread.
-        
+
         Args:
             interval (int): Interval between health checks in seconds
         """
@@ -72,9 +74,9 @@ class HealthMonitor:
                 print(f"⚠️ Error in health monitor: {e}")
                 # Wait before retrying to avoid rapid error loops
                 time.sleep(min(60, interval))  # Wait at least 60s or the interval if smaller
-        
+
         print("🛑 Health monitor stopped")
-    
+
     def _perform_health_checks(self):
         """Performs health checks on all devices."""
         for device in self.network_manager.devices.values():

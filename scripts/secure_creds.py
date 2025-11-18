@@ -105,7 +105,7 @@ def update_config_for_encryption():
     """Update the config module to handle encrypted credentials."""
     print("\nYou should update src/core/config.py to handle encrypted credentials.")
     print("Here's an example of how to modify the Settings class:")
-    
+
     print("""
 from pydantic_settings import BaseSettings
 import json
@@ -114,7 +114,6 @@ from cryptography.fernet import Fernet
 
 class Settings(BaseSettings):
     inventory_file: str = "inventory.yaml"
-    spacy_model: str = "en_core_web_sm"
     groq_model_name: str = "llama-3.1-8b-instant"
     groq_temperature: float = 0.7
     state_database_file: str = "agent_state.db"
@@ -131,7 +130,7 @@ class Settings(BaseSettings):
                 encrypted_data = json.load(f)
             with open(".env.key", "rb") as f:
                 key = f.read()
-            
+
             encrypted_key = base64.b64decode(encrypted_data["GROQ_API_KEY"])
             return Fernet(key).decrypt(encrypted_key).decode()
         except FileNotFoundError:
