@@ -54,6 +54,10 @@ def tool_executor(plan: List[Dict[str, Any]]) -> List[Any]:
 def _extract_steps_from_plan(plan: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Extracts the list of steps from the plan, handling different format variants.
 
+    The plan can come in two different formats:
+    1. New format: {"steps": [list of tool calls]}
+    2. Old format: [list of tool calls]
+
     Args:
         plan: The plan which may be a list of steps or a dict with 'steps' key
 
@@ -69,6 +73,9 @@ def _extract_steps_from_plan(plan: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 
 def _execute_single_step(tool_name: str, tool_args: Dict[str, Any]) -> Any:
     """Executes a single tool step.
+
+    Handles both LangChain tool objects and regular Python functions with the same interface,
+    providing a unified execution mechanism for all tool types.
 
     Args:
         tool_name: The name of the tool to execute
@@ -99,6 +106,12 @@ def _execute_single_step(tool_name: str, tool_args: Dict[str, Any]) -> Any:
 
 def _flatten_nested_result(result: Any) -> Any:
     """Flattens nested result structures by extracting nested 'result' values.
+
+    This utility handles inconsistent result structures that may occur when
+    different tool types return differently nested data structures. It handles:
+    - Double nested results: {"result": {"result": "actual_output"}}
+    - Single nested results: {"result": "actual_output"}
+    - Non-nested results: direct value
 
     Args:
         result: The result to flatten

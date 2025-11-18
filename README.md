@@ -42,11 +42,30 @@ The agent uses a **NLP-First** architecture that processes queries through a det
 ├── main.py              # CLI entry point
 ├── pyproject.toml       # Project dependencies
 ├── README.md
-└── src/
-    ├── agents/          # LangGraph agents (planner, executor)
-    ├── core/            # Core models and network manager
-    ├── graph/           # LangGraph workflow
-    └── tools/           # Network tools
+├── SECURITY.md          # Security considerations
+├── uv.lock              # Dependency lock file
+├── src/
+│   ├── __init__.py      # Package initialization
+│   ├── agents/          # AI agent implementations
+│   │   ├── __init__.py  # Agents package docs
+│   │   ├── analyzer.py  # Proactive analyzer for change detection
+│   │   ├── executor.py  # Tool executor for workflow operations
+│   │   └── planner.py   # Planner agent for creating execution plans
+│   ├── core/            # Core system components
+│   │   ├── __init__.py  # Core package docs
+│   │   ├── config.py    # Configuration settings
+│   │   ├── models.py    # Pydantic data models
+│   │   ├── network_manager.py  # Network device management
+│   │   └── state_manager.py   # Persistent state management
+│   ├── graph/           # Workflow orchestration
+│   │   ├── __init__.py  # Graph package docs
+│   │   └── workflow.py  # Main LangGraph workflow
+│   └── tools/           # Network operation tools
+│       ├── __init__.py  # Tools package docs
+│       ├── executor.py  # Command execution tools
+│       ├── inventory.py # Device inventory tools
+│       └── ping_tool.py # Network connectivity tools
+└── tests/               # Test suite
 ```
 
 ## 🚀 Getting Started
@@ -76,7 +95,7 @@ Create a `.env` file in the project root:
 GROQ_API_KEY="your_groq_api_key"
 ```
 
-5. Configure your network inventory in `inventory.yaml`:
+4. Configure your network inventory in `inventory.yaml`:
 ```yaml
 devices:
   - name: S1
@@ -147,6 +166,45 @@ The analysis feature compares current device states with historical snapshots to
 - Warning: Potential issues (increasing CPU, etc.)
 - Informational: Normal changes (uptime incrementing, etc.)
 
+## 📚 API Reference
+
+### Command-Line Interface
+
+The agent provides a Typer-based CLI with the following commands:
+
+#### `chat`
+Starts an interactive chat session with the network agent
+```
+uv run python main.py chat
+```
+
+#### `analyze`
+Runs a single, on-demand health analysis across all devices
+```
+uv run python main.py analyze
+```
+
+### Core Classes
+
+#### `NetworkWorkflow`
+Orchestrates the multi-agent workflow for processing network queries.
+
+- `__init__(api_key: str)`: Initialize with Groq API key
+- `run(query: str, chat_history: List[BaseMessage]) -> str`: Execute workflow with query
+
+#### `NetworkManager`
+Manages inventory, connections, and command execution for network devices.
+
+- `_load_inventory() -> Dict[str, Device]`: Load device inventory from YAML
+- `execute_command(device_name: str, command: str) -> str`: Execute CLI command on device
+- `close_all_sessions()`: Close all active connections
+
+#### `ProactiveAnalyzer`
+Analyzes changes in network device states over time.
+
+- `analyze_with_snapshot_storage(device_name: str, command: str, new_output: dict) -> dict`: Analyze change and store new output
+- `save_snapshot(device_name: str, command: str, output: dict)`: Save device state snapshot
+
 ## 🚀 Future Roadmap
 
 - **Proactive Monitoring Service:** Evolve the `analyze` command into a continuously running service (daemon) that performs health checks on a schedule (e.g., every 15 minutes).
@@ -160,6 +218,11 @@ This project follows modern Python best practices:
 - Dependency management with `uv`
 - Code formatting with `ruff`
 - Type checking and linting with `ruff`
+
+Before submitting changes:
+1. Run `ruff check --fix . && ruff format .` to format code
+2. Run tests to ensure functionality
+3. Add documentation for new features
 
 ## 📄 License
 

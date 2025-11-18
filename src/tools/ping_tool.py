@@ -41,7 +41,7 @@ def ping_host(
             # On Linux/Mac, use -c for count and -W for timeout (in seconds)
             cmd = ["ping", "-c", str(count), "-W", str(timeout), target]
 
-        # Execute the ping command
+        # Execute the ping command, with an overall timeout to prevent hanging
         result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,

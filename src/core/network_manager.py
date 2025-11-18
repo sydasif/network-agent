@@ -296,7 +296,11 @@ class NetworkManager:
     def _is_dangerous_command(self, command: str) -> bool:
         """Checks for potentially harmful commands.
 
-        Prevents execution of commands that could damage the network infrastructure.
+        Prevents execution of commands that could damage the network infrastructure or
+        compromise security. The function uses multiple layers of validation:
+        1. Pattern matching against known dangerous commands
+        2. De-obfuscation of commands to detect character substitution (e.g., "w r i t e")
+        3. Validation of shell command separators that could enable injection attacks
 
         Args:
             command (str): The command to check.

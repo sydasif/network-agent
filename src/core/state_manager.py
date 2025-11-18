@@ -54,7 +54,11 @@ class StateManager:
 
     @contextmanager
     def _get_db_connection(self):
-        """Context manager for database connections."""
+        """Context manager for database connections.
+
+        Ensures that database connections are properly closed even if an exception occurs.
+        This prevents connection leaks and handles proper cleanup.
+        """
         conn = sqlite3.connect(self.db_path)
         try:
             yield conn
@@ -71,7 +75,7 @@ class StateManager:
             command (str): The command that generated the state data.
             data (dict): The state data to store (will be JSON serialized).
         """
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.utcnow().isoformat()  # Use UTC timestamp for consistency across systems
         with self._get_db_connection() as conn:
             cursor = conn.cursor()
             # Using parameterized queries to prevent SQL injection
@@ -98,6 +102,7 @@ class StateManager:
         with self._get_db_connection() as conn:
             cursor = conn.cursor()
             # Using parameterized queries to prevent SQL injection
+            # ORDER BY timestamp DESC LIMIT 1 ensures we get only the most recent snapshot
             cursor.execute(
                 "SELECT data FROM device_snapshots WHERE device_name = ? AND command = ? ORDER BY timestamp DESC LIMIT 1",
                 (device_name, command),

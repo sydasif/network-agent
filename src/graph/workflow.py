@@ -106,7 +106,19 @@ class NetworkWorkflow:
         return workflow.compile()
 
     def _should_continue(self, state):
-        """Determine whether to continue with executor/generator nodes or end early."""
+        """Determine whether to continue with executor/generator nodes or end early.
+
+        This method implements conditional routing in the LangGraph workflow.
+        If a response has already been generated (e.g., for simple greetings or
+        ambiguous queries), the workflow should terminate early without executing
+        the planner, executor, and generator nodes.
+
+        Args:
+            state (AgentState): Current workflow state containing potential response
+
+        Returns:
+            str: Either "end" to terminate workflow early or "continue" to proceed
+        """
         # If there's already a response in the state, we should end early
         if state.get("response"):
             return "end"

@@ -116,6 +116,7 @@ class ProactiveAnalyzer:
                 "summary": "No change detected.",
             }
 
+        # Format the analysis prompt with previous and current states
         prompt = ANALYSIS_PROMPT.format(
             device_name=device_name,
             command=command,
@@ -134,6 +135,10 @@ class ProactiveAnalyzer:
         comparing the new output with the previous stored snapshot and then saving
         the new output as the latest snapshot.
 
+        The method follows a "baseline-first" approach. If no previous snapshot exists,
+        it stores the new output as the baseline and returns a "baseline stored" message.
+        If a previous snapshot exists, it compares the states and analyzes the changes.
+
         Args:
             device_name (str): Name of the device being analyzed.
             command (str): The command that generated the state data.
@@ -143,11 +148,14 @@ class ProactiveAnalyzer:
             dict: Analysis result from analyze_change method, or a baseline message
             if no previous snapshot was available.
         """
+        # Retrieve the previous state snapshot for comparison
         previous_output = self.load_snapshot(device_name, command)
 
-        # Save the new output as the current snapshot
+        # Save the new output as the current snapshot - this happens before comparison
+        # to ensure the new state is always stored, even if analysis fails
         self.save_snapshot(device_name, command, new_output)
 
+        # If no previous output exists, we're establishing the baseline
         if not previous_output:
             return {
                 "change_detected": False,
@@ -155,4 +163,5 @@ class ProactiveAnalyzer:
                 "summary": "Baseline stored.",
             }
 
+        # Compare the new output with the previous one and analyze the differences
         return self.analyze_change(device_name, command, previous_output, new_output)
