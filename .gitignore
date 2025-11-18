@@ -14,3 +14,4 @@ net_lab/
 .env
 logs/
 *.db
+inventory.yaml
