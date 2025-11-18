@@ -5,7 +5,7 @@ It loads configuration values from environment variables or a .env file and
 exposes a single settings instance that can be imported throughout the application.
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -25,19 +25,16 @@ class Settings(BaseSettings):
 
     inventory_file: str = "inventory.yaml"
     spacy_model: str = "en_core_web_sm"
-    groq_model_name: str = "openai/gpt-oss-20b"  # "llama-3.1-8b-instant"
+    groq_model_name: str = "llama-3.1-8b-instant"  # Updated to a current model
     groq_temperature: float = 0.7
     groq_api_key: str = ""
     state_database_file: str = "agent_state.db"
 
-    class Config:
-        """Pydantic configuration for loading settings.
-
-        Defines how settings should be loaded from environment variables or .env file.
-        """
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # This allows extra environment variables
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # This allows extra environment variables
+    )
 
 
 # Create a single, importable instance of the settings

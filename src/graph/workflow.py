@@ -37,7 +37,7 @@ class AgentState(TypedDict):
     input: UserIntent
     chat_history: List[BaseMessage]
     plan: List[dict]
-    tool_results: List[any]
+    tool_results: List[dict]
     response: str
 
 

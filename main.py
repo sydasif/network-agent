@@ -7,6 +7,7 @@ and orchestrates the entire workflow from user input to response generation.
 """
 import os
 from pathlib import Path
+from functools import lru_cache
 import typer
 import yaml
 from dotenv import load_dotenv
@@ -105,16 +106,11 @@ def chat():
     print("\n👋 All network sessions closed. Goodbye!")
 
 
-# Cache health checks to avoid file re-reading
-_cached_health_checks = None
-
+@lru_cache(maxsize=1)
 def _get_cached_health_checks():
     """Caches the health checks to avoid repeated file I/O operations."""
-    global _cached_health_checks
-    if _cached_health_checks is None:
-        with open("command.yaml", "r") as f:
-            _cached_health_checks = yaml.safe_load(f).get("health_checks", [])
-    return _cached_health_checks
+    with open("command.yaml", "r") as f:
+        return yaml.safe_load(f).get("health_checks", [])
 
 
 @app.command()
@@ -170,7 +166,6 @@ def analyze():
         print("-" * 40)
 
     network_manager.close_all_sessions()
-    state_manager.close()
     print("✅ Analysis complete.")
 
 
