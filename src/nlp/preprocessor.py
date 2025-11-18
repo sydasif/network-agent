@@ -16,11 +16,24 @@ This approach allows the NLP layer to be always in sync with the agent's capabil
 """
 import spacy
 import yaml
+import re
 from spacy.matcher import Matcher, PhraseMatcher
 from typing import List, Dict, Set
 from src.core.models import UserIntent, ExtractedEntities
 from src.tools.inventory import network_manager
 from src.core.config import settings
+
+# Define regex patterns for additional network entities
+INTERFACE_REGEX = r"\b(g|gi|gig|e|eth|fa|te|ten)\s*\d+\/\d+(\.\d+)?\b"
+VLAN_REGEX = r"\bvlan\s*(\d+)\b"
+IP_REGEX = r"\b\d{1,3}(?:\.\d{1,3}){3}\b"
+
+def normalize_device(device_name: str) -> str:
+    """Normalize device names to ensure consistent matching."""
+    if not device_name:
+        return device_name
+    # Remove extra spaces and convert to lowercase for consistent handling
+    return device_name.strip().lower()
 
 class NLPPreprocessor:
     """NLP pre-processor for classifying user intent and extracting entities.
@@ -128,6 +141,7 @@ class NLPPreprocessor:
 
         This method identifies and extracts various types of entities from the
         spaCy document, including device names, interfaces, protocols, and keywords.
+        It also extracts additional entities like IP addresses and VLANs using regex.
 
         Args:
             doc: The processed spaCy document.
@@ -135,9 +149,13 @@ class NLPPreprocessor:
         Returns:
             ExtractedEntities: An object containing all extracted entities.
         """
-        # This logic remains the same
+        # Extract entities using spaCy patterns first
         matches = self.matcher(doc) + self.phrase_matcher(doc)
         entities = ExtractedEntities(device_names=[], interfaces=[], protocols=[], keywords=[])
+
+        # Initialize additional entity lists
+        ip_addresses = []
+        vlans = []
 
         # Use a set to avoid duplicate entities from overlapping matches
         found_entities = set()
@@ -160,6 +178,23 @@ class NLPPreprocessor:
                 entities.keywords.append(entity_text.lower())
 
             found_entities.add((entity_label, entity_text))
+
+        # Extract additional entities using regex after spaCy processing
+        text_lower = doc.text.lower()
+
+        # Extract IP addresses using regex
+        ip_matches = re.findall(IP_REGEX, text_lower)
+        ip_addresses.extend(ip_matches)
+
+        # Extract VLANs using regex
+        vlan_matches = re.findall(VLAN_REGEX, text_lower)
+        vlans.extend(vlan_matches)
+
+        # Set additional entities if they exist
+        if ip_addresses:
+            entities.ip_addresses = ip_addresses
+        if vlans:
+            entities.vlans = vlans
 
         return entities
 

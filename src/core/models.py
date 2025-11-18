@@ -64,6 +64,8 @@ class ExtractedEntities(BaseModel):
         interfaces (Optional[List[str]]): A list of interface names extracted from the query.
         protocols (Optional[List[str]]): A list of networking protocols extracted from the query.
         keywords (Optional[List[str]]): Other key terms extracted from the query.
+        ip_addresses (Optional[List[str]]): A list of IP addresses extracted from the query.
+        vlans (Optional[List[str]]): A list of VLAN IDs extracted from the query.
     """
 
     device_names: Optional[List[str]] = Field(
@@ -77,6 +79,12 @@ class ExtractedEntities(BaseModel):
     )
     keywords: Optional[List[str]] = Field(
         None, description="Other key terms like 'flaps', 'errors', 'config'"
+    )
+    ip_addresses: Optional[List[str]] = Field(
+        None, description="A list of IP addresses, like ['192.168.1.1']"
+    )
+    vlans: Optional[List[str]] = Field(
+        None, description="A list of VLAN IDs, like ['10', '20']"
     )
 
 

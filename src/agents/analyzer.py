@@ -6,8 +6,12 @@ It uses an LLM to analyze differences between previous and current states,
 categorizing them as Critical, Warning, or Informational.
 """
 import json
+import os
+import hashlib
 from langchain_groq import ChatGroq
 from src.core.config import settings
+from src.core.state_manager import StateManager
+import difflib
 
 ANALYSIS_PROMPT = """
 You are an expert Senior Network Engineer. Analyze the change in a device's state from the output of the command `{command}` on device `{device_name}`.
@@ -39,10 +43,11 @@ class ProactiveAnalyzer:
 
     Attributes:
         llm: The ChatGroq LLM instance used for analysis.
+        state_manager: Instance of StateManager for persistent snapshot storage.
     """
 
     def __init__(self, api_key: str):
-        """Initializes the ProactiveAnalyzer with an LLM instance.
+        """Initializes the ProactiveAnalyzer with an LLM instance and StateManager.
 
         Args:
             api_key (str): The Groq API key for accessing the LLM service.
@@ -53,6 +58,35 @@ class ProactiveAnalyzer:
             temperature=0.1,
             model_kwargs={"response_format": {"type": "json_object"}}
         )
+        self.state_manager = StateManager()
+
+    def save_snapshot(self, device_name: str, command: str, output: dict):
+        """Saves a device state snapshot to the database.
+
+        Stores the current state data for a specific device and command with a timestamp.
+
+        Args:
+            device_name (str): Name of the device being snapshotted.
+            command (str): The command that generated the state data.
+            output (dict): The state data to store.
+        """
+        self.state_manager.save_snapshot(device_name, command, output)
+
+    def load_snapshot(self, device_name: str, command: str) -> dict:
+        """Retrieves the most recent state snapshot for a device and command.
+
+        Fetches the latest stored state for the specified device and command from
+        the database. Returns None if no snapshot exists.
+
+        Args:
+            device_name (str): Name of the device to retrieve state for.
+            command (str): The command that generated the state data.
+
+        Returns:
+            Optional[dict]: The most recent state data as a dictionary, or None
+            if no snapshot exists for the device and command combination.
+        """
+        return self.state_manager.get_latest_snapshot(device_name, command)
 
     def analyze_change(self, device_name: str, command: str, previous_state: dict, current_state: dict) -> dict:
         """Analyzes changes between previous and current device states.
@@ -85,3 +119,29 @@ class ProactiveAnalyzer:
         )
         response = self.llm.invoke(prompt)
         return json.loads(response.content)
+
+    def analyze_with_snapshot_storage(self, device_name: str, command: str, new_output: dict) -> dict:
+        """Analyzes change by comparing new output with stored snapshot, then saves the new output.
+
+        This method combines the snapshot storage functionality with the analysis,
+        comparing the new output with the previous stored snapshot and then saving
+        the new output as the latest snapshot.
+
+        Args:
+            device_name (str): Name of the device being analyzed.
+            command (str): The command that generated the state data.
+            new_output (dict): The new state data to compare and store.
+
+        Returns:
+            dict: Analysis result from analyze_change method, or a baseline message
+            if no previous snapshot was available.
+        """
+        old_output = self.load_snapshot(device_name, command)
+
+        # Save the new output as the current snapshot
+        self.save_snapshot(device_name, command, new_output)
+
+        if not old_output:
+            return {"change_detected": False, "significance": "Informational", "summary": "Baseline stored."}
+
+        return self.analyze_change(device_name, command, old_output, new_output)

@@ -6,6 +6,7 @@ It includes safety features like dangerous command detection and output sanitiza
 """
 
 import re
+import ipaddress
 from typing import Dict, Optional
 from dataclasses import dataclass
 import yaml
@@ -74,13 +75,57 @@ class NetworkManager:
         try:
             with open(self.inventory_file, "r") as f:
                 data = yaml.safe_load(f)
-            return {
-                dev_data["name"]: Device(**dev_data)
-                for dev_data in data.get("devices", [])
-            }
+
+            # Validate each device before creating Device objects
+            validated_devices = {}
+            for dev_data in data.get("devices", []):
+                self._validate_device(dev_data)
+                validated_devices[dev_data["name"]] = Device(**dev_data)
+
+            return validated_devices
         except Exception as e:
             print(f"Error loading inventory: {e}")
             return {}
+
+    def _validate_device(self, dev_data: dict) -> None:
+        """Validates a device's inventory entry.
+
+        Checks for valid IP format, device type, and required credentials.
+
+        Args:
+            dev_data (dict): Device information from the inventory
+
+        Raises:
+            ValueError: If validation fails
+        """
+        # Validate required fields exist
+        required_fields = ["name", "hostname", "username", "password", "device_type"]
+        for field in required_fields:
+            if field not in dev_data or not dev_data[field]:
+                raise ValueError(f"Missing required field '{field}' in device inventory")
+
+        # Validate device type (connection type in the context of netmiko)
+        device_type = dev_data.get("device_type", "").lower()
+        # Common valid netmiko device types
+        valid_device_types = [
+            "cisco_ios", "cisco_xe", "cisco_xr", "cisco_nxos",
+            "juniper_junos", "arista_eos", "hp_procurve", "hp_comware",
+            "huawei", "nokia_sros", "fortinet", "paloalto_panos"
+        ]
+        if device_type not in valid_device_types:
+            print(f"Warning: '{device_type}' is not a standard netmiko device type")
+
+        # Validate IP address format
+        hostname = dev_data.get("hostname")
+        if hostname:
+            try:
+                # Try to parse as IP address
+                ipaddress.ip_address(hostname)
+            except ValueError:
+                # If it's not a valid IP, check if it's a valid hostname format
+                hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.?$'
+                if not re.match(hostname_pattern, hostname):
+                    raise ValueError(f"Invalid IP address or hostname format: {hostname}")
 
     def get_device(self, device_name: str) -> Optional[Device]:
         """Retrieves a device by its name.

@@ -34,6 +34,10 @@ Convert the structured intent into a concrete plan of tool calls.
 8.  If interfaces are extracted from the query, incorporate them into the command by replacing {{interface_name}} placeholders with the actual interface names:
     - For "show running-config interface {{interface_name}}" command, replace {{interface_name}} with the actual extracted interface name like "GigabitEthernet0/1"
     - Use the first interface in the entities.interfaces list if multiple interfaces are provided
+9. If VLAN IDs are extracted from the query, incorporate them into the command by replacing {{vlan_id}} placeholders with actual VLAN numbers:
+    - For "show vlan {{vlan_id}}" command, replace {{vlan_id}} with the actual extracted VLAN ID like "10"
+10. If IP addresses are extracted from the query, incorporate them into the command by replacing {{ip_address}} placeholders with actual IP addresses:
+    - For "show ip route {{ip_address}}" or "ping {{ip_address}}" commands, replace {{ip_address}} with the actual extracted IP address like "192.168.1.1"
 
 **Example 1 (No interface):**
 Structured Intent:
@@ -71,6 +75,44 @@ Your Plan:
     }}
   ],
   "reasoning": "The user wants to see the running configuration for interface GigabitEthernet0/1 on S1. I will use `run_network_command` with the interface-specific command."
+}}
+
+**Example 3 (With VLAN):**
+Structured Intent:
+{{
+  "query": "show vlan 10 on S1",
+  "intent": "get_status",
+  "entities": {{ "device_names": ["S1"], "vlans": ["10"] }}
+}}
+
+Your Plan:
+{{
+  "plan": [
+    {{
+      "tool": "run_network_command",
+      "args": {{"device_name": "S1", "command": "show vlan 10"}}
+    }}
+  ],
+  "reasoning": "The user wants to see information about VLAN 10 on S1. I will use `run_network_command` with the VLAN-specific command."
+}}
+
+**Example 4 (With IP address):**
+Structured Intent:
+{{
+  "query": "show route to 192.168.1.0 on R1",
+  "intent": "get_status",
+  "entities": {{ "device_names": ["R1"], "ip_addresses": ["192.168.1.0"] }}
+}}
+
+Your Plan:
+{{
+  "plan": [
+    {{
+      "tool": "run_network_command",
+      "args": {{"device_name": "R1", "command": "show ip route 192.168.1.0"}}
+    }}
+  ],
+  "reasoning": "The user wants to see the route to IP address 192.168.1.0 on R1. I will use `run_network_command` with the IP-specific command."
 }}
 
 Now, create a plan for the provided structured intent.

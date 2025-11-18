@@ -24,17 +24,27 @@ def tool_executor(plan: List[Dict[str, Any]]) -> List[Any]:
     Each tool call in the plan specifies a tool name and arguments to pass to the tool.
     The function handles both successful execution and error cases.
 
+    The function detects whether the plan is a simple list of steps or has a "steps" key
+    containing the list of steps, and processes accordingly.
+
     Args:
-        plan (List[Dict[str, Any]]): A list of tool call dictionaries, each containing
-            'tool' (str) and 'args' (dict) keys.
+        plan (List[Dict[str, Any]]): A list of tool call dictionaries or a dictionary
+            containing a "steps" key with the list of tool call dictionaries.
 
     Returns:
         List[Any]: A list of results from each tool call execution. Each result will
         be either the output of the tool or an error message string if the tool
         execution failed or if the tool name is unknown.
     """
+    # Detect if the plan is in the new format with "steps" key
+    if isinstance(plan, dict) and "steps" in plan:
+        steps = plan.get("steps", [])
+    else:
+        # Assume it's the old format - a list of steps
+        steps = plan if isinstance(plan, list) else []
+
     results = []
-    for step in plan:
+    for step in steps:
         tool_name = step.get("tool")
         tool_args = step.get("args", {})
 
@@ -47,6 +57,17 @@ def tool_executor(plan: List[Dict[str, Any]]) -> List[Any]:
                 else:
                     # For regular Python functions, call directly with the arguments
                     result = tool_function(**tool_args)
+
+                # Clean double layered output by flattening nested result structures
+                # If result has a 'result' key containing another 'result', flatten it
+                if isinstance(result, dict) and "result" in result:
+                    if isinstance(result["result"], dict) and "result" in result["result"]:
+                        # Double nested: {"result": {"result": "actual_output"}}
+                        result = result["result"]["result"]
+                    elif isinstance(result["result"], (str, int, float, bool, list, dict)):
+                        # Single nested: {"result": "actual_output"}
+                        result = result["result"]
+
                 results.append(result)
             except Exception as e:
                 results.append(f"Error executing tool {tool_name}: {e}")

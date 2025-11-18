@@ -146,17 +146,31 @@ class NetworkWorkflow:
                 print(f"No plan found in response: {content[:200]}...")
                 plan = []
 
-        # Process the plan to substitute interface names where needed
+        # Process the plan to substitute interface names, VLAN IDs, and IP addresses where needed
         processed_plan = []
         for step in plan:
             if isinstance(step, dict) and "args" in step and "command" in step["args"]:
                 command = step["args"]["command"]
                 interfaces = state["input"].entities.interfaces
+                vlans = state["input"].entities.vlans
+                ip_addresses = state["input"].entities.ip_addresses
 
                 # If the command contains interface_name placeholder and we have interfaces
                 if "{interface_name}" in command and interfaces:
                     # Use the first interface from the list
                     command = command.replace("{interface_name}", interfaces[0])
+                    step["args"]["command"] = command
+
+                # If the command contains vlan_id placeholder and we have VLANs
+                if "{vlan_id}" in command and vlans:
+                    # Use the first VLAN from the list
+                    command = command.replace("{vlan_id}", vlans[0])
+                    step["args"]["command"] = command
+
+                # If the command contains ip_address placeholder and we have IP addresses
+                if "{ip_address}" in command and ip_addresses:
+                    # Use the first IP address from the list
+                    command = command.replace("{ip_address}", ip_addresses[0])
                     step["args"]["command"] = command
             processed_plan.append(step)
 

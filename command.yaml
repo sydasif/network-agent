@@ -31,6 +31,42 @@ get_status:
     command: "show logging"
     description: "Displays the device's local log buffer."
 
+  - keywords: [ "interface status" ]
+    entities:
+      KEYWORD: [ "interface", "status" ]
+    command: "show interface status"
+    description: "Displays the status of switch interfaces."
+
+  - keywords: [ "ospf" ]
+    entities:
+      PROTOCOL: [ "ospf" ]
+    command: "show ip ospf neighbor"
+    description: "Displays OSPF neighbor information."
+
+  - keywords: [ "mac", "table", "mac table" ]
+    entities:
+      PROTOCOL: [ "mac" ]
+    command: "show mac address-table"
+    description: "Displays the MAC address table."
+
+  - keywords: [ "arp", "table", "arp table" ]
+    entities:
+      PROTOCOL: [ "arp" ]
+    command: "show ip arp"
+    description: "Displays the ARP table."
+
+  - keywords: [ "route", "routing" ]
+    entities:
+      PROTOCOL: [ "route" ]
+    command: "show ip route"
+    description: "Displays the IP routing table."
+
+  - keywords: [ "cdp", "lldp" ]
+    entities:
+      PROTOCOL: [ "cdp", "lldp" ]
+    command: "show cdp neighbors"
+    description: "Displays CDP neighbor information."
+
   - default: "show version"
 
 get_config:
@@ -39,6 +75,35 @@ get_config:
       KEYWORD: [ "interface", "config" ]
     command: "show running-config interface {interface_name}" # Placeholder for future enhancement
     description: "Displays the running configuration for a specific interface."
+
+  - keywords: [ "vlan", "vlans", "config", "configuration" ]
+    entities:
+      PROTOCOL: [ "vlan" ]
+      KEYWORD: [ "config" ]
+    command: "show running-config | section vlan {vlan_id}"
+    description: "Displays the configuration for a specific VLAN."
+
+  - keywords: [ "route", "routing", "config", "configuration" ]
+    entities:
+      PROTOCOL: [ "route" ]
+      KEYWORD: [ "config" ]
+    command: "show running-config | section router"
+    description: "Displays routing configuration."
+
+  - keywords: [ "bgp", "config", "configuration" ]
+    entities:
+      PROTOCOL: [ "bgp" ]
+      KEYWORD: [ "config" ]
+    command: "show running-config | section router bgp"
+    description: "Displays BGP configuration."
+
+  - keywords: [ "ospf", "config", "configuration" ]
+    entities:
+      PROTOCOL: [ "ospf" ]
+      KEYWORD: [ "config" ]
+    command: "show running-config | section router ospf"
+    description: "Displays OSPF configuration."
+
   - default: "show running-config"
 
 find_device:
@@ -47,6 +112,20 @@ find_device:
       KEYWORD: [ "find", "list", "search", "which" ]
     command: "show inventory"
     description: "Find and list network devices."
+
+  - keywords: [ "arp", "table", "arp table", "devices", "connected" ]
+    entities:
+      PROTOCOL: [ "arp" ]
+      KEYWORD: [ "arp", "devices" ]
+    command: "show ip arp"
+    description: "Show devices connected based on ARP table."
+
+  - keywords: [ "cdp", "lldp", "neighbors", "connected", "devices" ]
+    entities:
+      PROTOCOL: [ "cdp", "lldp" ]
+      KEYWORD: [ "neighbors", "devices" ]
+    command: "show cdp neighbors"
+    description: "Show connected neighboring devices via CDP."
 
 
 greeting:
@@ -59,8 +138,8 @@ greeting:
 # We can also define entities that don't map to a specific command
 # but are important for the NLP layer to recognize.
 global_entities:
-  PROTOCOL: [ "ospf", "eigrp", "spanning-tree", "stp" ]
-  KEYWORD: [ "flaps", "errors", "config", "down", "up", "critical" ]
+  PROTOCOL: [ "ospf", "eigrp", "spanning-tree", "stp", "bgp", "rip", "isis", "mpls", "vlan", "vtp", "stp", "hsrp", "vrrp", "glbp", "dhcp", "dns" ]
+  KEYWORD: [ "flaps", "errors", "config", "down", "up", "critical", "warning", "interface", "port", "status", "running", "startup", "neighbor", "route", "routing", "mac", "arp", "cdp", "lldp", "trunk", "access" ]
 
 # New section for the on-demand analysis feature
 health_checks:
