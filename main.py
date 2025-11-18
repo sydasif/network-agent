@@ -6,7 +6,6 @@ analysis. It handles environment loading, initializes the system components,
 and orchestrates the entire workflow from user input to response generation.
 """
 import os
-import time
 from pathlib import Path
 from functools import lru_cache
 import typer
@@ -18,7 +17,6 @@ from src.tools.inventory import network_manager
 from src.core.config import settings
 from src.core.state_manager import StateManager
 from src.agents.analyzer import ProactiveAnalyzer
-from src.core.health_monitor import HealthMonitor
 
 
 # Create a Typer app
@@ -166,62 +164,6 @@ def analyze():
         network_manager.close_all_sessions()
 
 
-# Global health monitor instance
-health_monitor = None
-
-
-@app.command()
-def monitor(interval: int = 900):
-    """Starts the continuous health monitoring service.
-
-    This command starts a daemon process that continuously monitors network devices
-    according to the default health checks, running checks at the specified interval.
-
-    Args:
-        interval (int): Interval between health checks in seconds (default: 900 = 15min)
-    """
-    load_dotenv()
-    print("🤖 AI Network Agent - Continuous Health Monitor")
-    print("=" * 60)
-
-    groq_api_key = os.getenv("GROQ_API_KEY") or settings.groq_api_key
-    if not groq_api_key:
-        print("⚠️ GROQ_API_KEY not set!")
-        return
-
-    if not Path(settings.inventory_file).exists():
-        print(f"⚠️ Inventory file '{settings.inventory_file}' not found. Please create one.")
-        return
-    print(f"📦 Inventory loaded: {len(network_manager.devices)} devices found.")
-
-    global health_monitor
-    try:
-        health_monitor = HealthMonitor(api_key=groq_api_key)
-        health_monitor.start_monitoring(interval=interval)
-
-        print(f"📊 Health monitor running with {len(health_monitor.health_checks)} checks")
-        print("Press Ctrl+C to stop the monitor...")
-
-        # Keep the main thread alive to allow the monitor to run
-        try:
-            while health_monitor.health_running:
-                time.sleep(1)  # Check every second if the monitor is still running
-        except KeyboardInterrupt:
-            print("\n⚠️  Health monitor interrupted by user.")
-            stop_monitor()
-
-    except Exception as e:
-        print(f"❌ Error starting health monitor: {e}")
-        return
-
-
-def stop_monitor():
-    """Stops the health monitoring service gracefully."""
-    global health_monitor
-    if health_monitor:
-        health_monitor.stop_monitoring()
-        health_monitor = None
-        print("✅ Health monitor service stopped gracefully.")
 
 
 if __name__ == "__main__":
