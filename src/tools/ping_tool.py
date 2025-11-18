@@ -13,10 +13,12 @@ from src.core.models import CommandOutput
 
 
 @tool
-def ping_host(target: str, count: Optional[int] = 4, timeout: Optional[int] = 5) -> CommandOutput:
+def ping_host(
+    target: str, count: Optional[int] = 4, timeout: Optional[int] = 5
+) -> CommandOutput:
     """Pings a specified IP address or hostname to test network connectivity.
 
-    This tool executes a ping command to verify network connectivity to a specific 
+    This tool executes a ping command to verify network connectivity to a specific
     destination. It works on both Windows and Unix-like systems (Linux/Mac).
 
     Args:
@@ -38,29 +40,31 @@ def ping_host(target: str, count: Optional[int] = 4, timeout: Optional[int] = 5)
         else:
             # On Linux/Mac, use -c for count and -W for timeout (in seconds)
             cmd = ["ping", "-c", str(count), "-W", str(timeout), target]
-        
+
         # Execute the ping command
         result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout * count + 5  # Add extra time to ensure command completes
+            timeout=timeout * count + 5,  # Add extra time to ensure command completes
         )
-        
+
         # Determine the status based on return code
         status = "success" if result.returncode == 0 else "error"
         output = result.stdout
-        
+
         if result.stderr:
             output += f"\nSTDERR: {result.stderr}"
-        
+
         return CommandOutput(
             device_name=target,  # For ping, we'll use target as device name
             command=f"ping {target} -c {count}",
             output=output,
             status=status,
-            error_message=None if result.returncode == 0 else f"Command failed with return code {result.returncode}"
+            error_message=None
+            if result.returncode == 0
+            else f"Command failed with return code {result.returncode}",
         )
     except subprocess.TimeoutExpired:
         return CommandOutput(
@@ -68,7 +72,7 @@ def ping_host(target: str, count: Optional[int] = 4, timeout: Optional[int] = 5)
             command=f"ping {target} -c {count}",
             output="",
             status="error",
-            error_message="Ping command timed out"
+            error_message="Ping command timed out",
         )
     except Exception as e:
         return CommandOutput(
@@ -76,5 +80,5 @@ def ping_host(target: str, count: Optional[int] = 4, timeout: Optional[int] = 5)
             command=f"ping {target} -c {count}",
             output="",
             status="error",
-            error_message=str(e)
+            error_message=str(e),
         )

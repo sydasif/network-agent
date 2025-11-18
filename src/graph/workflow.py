@@ -38,7 +38,7 @@ class AgentState(TypedDict):
 
     input: str  # Raw user query
     chat_history: List[BaseMessage]
-    structured_intent: UserIntent # The structured output
+    structured_intent: UserIntent  # The structured output
     plan: List[dict]
     tool_results: List[dict]
     response: str
@@ -65,12 +65,9 @@ class NetworkWorkflow:
             api_key (str): The Groq API key for accessing the LLM service.
         """
         self.llm = ChatGroq(
-            groq_api_key=api_key,
-            model_name=settings.groq_model_name,
-            temperature=0
+            groq_api_key=api_key, model_name=settings.groq_model_name, temperature=0
         )
 
-        # --- THE MAGIC HAPPENS HERE ---
         # This creates a specialized LLM that ONLY outputs your Pydantic model.
         # It handles the prompt, the schema, and the validation automatically.
         self.intent_classifier = self.llm.with_structured_output(UserIntent)
@@ -95,18 +92,13 @@ class NetworkWorkflow:
         workflow.add_node("executor", self.executor_node)
         workflow.add_node("generator", self.generator_node)
 
-        workflow.set_entry_point("preprocessor") # Start here
+        workflow.set_entry_point("preprocessor")  # Start here
 
         workflow.add_edge("preprocessor", "planner")
 
         # Conditional edge from planner - if there's a response, go directly to END, otherwise proceed with execution
         workflow.add_conditional_edges(
-            "planner",
-            self._should_continue,
-            {
-                "continue": "executor",
-                "end": END
-            }
+            "planner", self._should_continue, {"continue": "executor", "end": END}
         )
 
         workflow.add_edge("executor", "generator")
@@ -124,30 +116,76 @@ class NetworkWorkflow:
         """Classify intent using the structured LLM."""
         print(f"🔍 Analyzing: {state['input']}")
 
-        query = state['input'].strip().lower()
+        query = state["input"].strip().lower()
 
         # Handle simple cases before attempting structured output
-        if query in ["hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening", "good night"]:
-            from src.core.models import ExtractedEntities
-            intent = UserIntent(intent="greeting", entities=ExtractedEntities(), is_ambiguous=False)
+        if query in [
+            "hi",
+            "hello",
+            "hey",
+            "greetings",
+            "good morning",
+            "good afternoon",
+            "good evening",
+            "good night",
+        ]:
+            intent = self._create_greeting_intent()
             return {
                 "structured_intent": intent,
                 "response": "Hello! I'm your network assistant. How can I help?",
-                "plan": []
+                "plan": [],
             }
 
+        # Attempt to classify the intent using the LLM, with fallback processing
+        intent = self._classify_intent_or_fallback(query, state["input"])
+
+        # Quick routing checks based on intent - return early for simple queries to avoid planner issues
+        if intent.intent == "greeting":
+            return {
+                "structured_intent": intent,
+                "response": "Hello! I'm your network assistant. How can I help?",
+                "plan": [],
+            }
+        if intent.is_ambiguous:
+            return {
+                "structured_intent": intent,
+                "response": "Could you please specify which device you are referring to?",
+                "plan": [],
+            }
+
+        return {"structured_intent": intent}
+
+    def _create_greeting_intent(self) -> UserIntent:
+        """Create a greeting intent with empty entities."""
+        from src.core.models import ExtractedEntities
+
+        return UserIntent(
+            intent="greeting", entities=ExtractedEntities(), is_ambiguous=False
+        )
+
+    def _classify_intent_or_fallback(
+        self, query: str, original_input: str
+    ) -> UserIntent:
+        """Attempt to classify the intent using the LLM, with fallback to basic parsing.
+
+        Args:
+            query: The normalized query string
+            original_input: The original input string for pattern matching
+
+        Returns:
+            The classified UserIntent
+        """
         try:
             # One line to do all the NLP work
-            intent = self.intent_classifier.invoke(state['input'])
+            return self.intent_classifier.invoke(original_input)
         except Exception as e:
             # If the structured output fails, attempt to extract basic information manually
             print(f"⚠️ Structured output failed, using fallback: {e}")
             # For simple cases, create a default intent
             from src.core.models import ExtractedEntities
+
             intent = UserIntent(
-                intent="unknown",
-                entities=ExtractedEntities(),
-                is_ambiguous=False
+                intent="unknown", entities=ExtractedEntities(), is_ambiguous=False
             )
 
             # Try to detect basic intent patterns
@@ -156,28 +194,11 @@ class NetworkWorkflow:
             elif any(word in query for word in ["ping"]):
                 intent.intent = "ping"
                 # Try to extract IP addresses using basic regex
-                ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
-                ip_matches = re.findall(ip_pattern, state['input'])
+                ip_pattern = r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"
+                ip_matches = re.findall(ip_pattern, original_input)
                 intent.entities.ip_addresses = ip_matches
 
-        # Quick routing checks based on intent - return early for simple queries to avoid planner issues
-        if intent.intent == "greeting":
-            return {
-                "structured_intent": intent,
-                "response": "Hello! I'm your network assistant. How can I help?",
-                "plan": []
-            }
-        if intent.is_ambiguous:
-            return {
-                "structured_intent": intent,
-                "response": "Could you please specify which device you are referring to?",
-                "plan": []
-            }
-
-        # Optional: Simple logic to inject available devices if needed for context
-        # (The LLM usually figures it out, but you can add context to the prompt if needed)
-
-        return {"structured_intent": intent}
+            return intent
 
     def planner_node(self, state: AgentState):
         """The planner node that creates an execution plan from the user intent.
@@ -201,16 +222,42 @@ class NetworkWorkflow:
 
         # Quick routing checks based on intent - return early for simple queries
         if intent.intent == "greeting":
-            return {"response": "Hello! I'm your network assistant. How can I help?", "plan": []}
+            return {
+                "response": "Hello! I'm your network assistant. How can I help?",
+                "plan": [],
+            }
         if intent.is_ambiguous:
-            return {"response": "Could you please specify which device you are referring to?", "plan": []}
+            return {
+                "response": "Could you please specify which device you are referring to?",
+                "plan": [],
+            }
 
+        # Generate the plan using the LLM
+        plan = self._generate_plan(intent, state["chat_history"])
+
+        # Process the plan to substitute interface names, VLAN IDs, and IP addresses where needed
+        processed_plan = self._process_plan_with_entity_placeholders(plan, intent)
+
+        return {"plan": processed_plan}
+
+    def _generate_plan(
+        self, intent: UserIntent, chat_history: List[BaseMessage]
+    ) -> List[dict]:
+        """Generate a plan by invoking the planner LLM with the intent and chat history.
+
+        Args:
+            intent: The structured intent from NLP preprocessing
+            chat_history: The conversation history
+
+        Returns:
+            A list of plan steps
+        """
         prompt = get_planner_prompt()
         planner_chain = prompt | self.llm
         # Convert to JSON string for the prompt as expected by the template
         input_json = intent.model_dump_json(indent=2)
         response = planner_chain.invoke(
-            {"input": input_json, "chat_history": state["chat_history"]}
+            {"input": input_json, "chat_history": chat_history}
         )
 
         # Handle the LLM response that may not be valid JSON
@@ -245,7 +292,20 @@ class NetworkWorkflow:
                 print(f"No plan found in response: {content[:200]}...")
                 plan = []
 
-        # Process the plan to substitute interface names, VLAN IDs, and IP addresses where needed
+        return plan
+
+    def _process_plan_with_entity_placeholders(
+        self, plan: List[dict], intent: UserIntent
+    ) -> List[dict]:
+        """Process the plan to substitute interface names, VLAN IDs, and IP addresses where needed.
+
+        Args:
+            plan: The original plan from the LLM
+            intent: The structured intent containing entity information
+
+        Returns:
+            A processed plan with placeholders replaced by actual values
+        """
         processed_plan = []
         for step in plan:
             if isinstance(step, dict) and "args" in step and "command" in step["args"]:
@@ -273,7 +333,7 @@ class NetworkWorkflow:
                     step["args"]["command"] = command
             processed_plan.append(step)
 
-        return {"plan": processed_plan}
+        return processed_plan
 
     def executor_node(self, state: AgentState):
         """The executor node that runs the planned tool calls.
@@ -338,5 +398,6 @@ class NetworkWorkflow:
         except KeyboardInterrupt:
             # Ensure all network sessions are closed if user interrupts the workflow
             from src.tools.inventory import network_manager
+
             network_manager.close_all_sessions()
             raise  # Re-raise the KeyboardInterrupt to maintain the expected behavior

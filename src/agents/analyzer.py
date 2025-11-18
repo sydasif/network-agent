@@ -5,13 +5,11 @@ states over time to detect changes and assess their operational significance.
 It uses an LLM to analyze differences between previous and current states,
 categorizing them as Critical, Warning, or Informational.
 """
+
 import json
-import os
-import hashlib
 from langchain_groq import ChatGroq
 from src.core.config import settings
 from src.core.state_manager import StateManager
-import difflib
 
 ANALYSIS_PROMPT = """
 You are an expert Senior Network Engineer. Analyze the change in a device's state from the output of the command `{command}` on device `{device_name}`.
@@ -32,6 +30,7 @@ You are an expert Senior Network Engineer. Analyze the change in a device's stat
 - "significance": "Informational", "Warning", or "Critical"
 - "summary": "Your one-sentence summary here."
 """
+
 
 class ProactiveAnalyzer:
     """Analyzes changes in network device states over time.
@@ -56,7 +55,7 @@ class ProactiveAnalyzer:
             groq_api_key=api_key,
             model_name=settings.groq_model_name,
             temperature=0.1,
-            model_kwargs={"response_format": {"type": "json_object"}}
+            model_kwargs={"response_format": {"type": "json_object"}},
         )
         self.state_manager = StateManager()
 
@@ -88,7 +87,9 @@ class ProactiveAnalyzer:
         """
         return self.state_manager.get_latest_snapshot(device_name, command)
 
-    def analyze_change(self, device_name: str, command: str, previous_state: dict, current_state: dict) -> dict:
+    def analyze_change(
+        self, device_name: str, command: str, previous_state: dict, current_state: dict
+    ) -> dict:
         """Analyzes changes between previous and current device states.
 
         Compares two device states and determines if significant changes occurred
@@ -109,18 +110,24 @@ class ProactiveAnalyzer:
                 - "summary": one-sentence summary of the change
         """
         if previous_state == current_state:
-            return {"change_detected": False, "significance": "Informational", "summary": "No change detected."}
+            return {
+                "change_detected": False,
+                "significance": "Informational",
+                "summary": "No change detected.",
+            }
 
         prompt = ANALYSIS_PROMPT.format(
             device_name=device_name,
             command=command,
             previous_state=json.dumps(previous_state, indent=2),
-            current_state=json.dumps(current_state, indent=2)
+            current_state=json.dumps(current_state, indent=2),
         )
         response = self.llm.invoke(prompt)
         return json.loads(response.content)
 
-    def analyze_with_snapshot_storage(self, device_name: str, command: str, new_output: dict) -> dict:
+    def analyze_with_snapshot_storage(
+        self, device_name: str, command: str, new_output: dict
+    ) -> dict:
         """Analyzes change by comparing new output with stored snapshot, then saves the new output.
 
         This method combines the snapshot storage functionality with the analysis,
@@ -136,12 +143,16 @@ class ProactiveAnalyzer:
             dict: Analysis result from analyze_change method, or a baseline message
             if no previous snapshot was available.
         """
-        old_output = self.load_snapshot(device_name, command)
+        previous_output = self.load_snapshot(device_name, command)
 
         # Save the new output as the current snapshot
         self.save_snapshot(device_name, command, new_output)
 
-        if not old_output:
-            return {"change_detected": False, "significance": "Informational", "summary": "Baseline stored."}
+        if not previous_output:
+            return {
+                "change_detected": False,
+                "significance": "Informational",
+                "summary": "Baseline stored.",
+            }
 
-        return self.analyze_change(device_name, command, old_output, new_output)
+        return self.analyze_change(device_name, command, previous_output, new_output)

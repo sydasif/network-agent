@@ -8,11 +8,11 @@ It includes safety features like dangerous command detection and output sanitiza
 import re
 import ipaddress
 from typing import Dict, Optional
+from typing import ClassVar
 from dataclasses import dataclass
 import yaml
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
-import functools
 
 
 @dataclass
@@ -55,13 +55,14 @@ class NetworkManager:
         sessions (Dict[str, ConnectHandler]): Active Netmiko connections to devices.
     """
 
-    def __init__(self, inventory_file: str = None):
+    def __init__(self, inventory_file: str | None = None):
         """Initializes the NetworkManager and loads device inventory.
 
         Args:
             inventory_file (str, optional): Path to inventory file. Uses default if None.
         """
         from src.core.config import settings
+
         self.inventory_file = inventory_file or settings.inventory_file
         self.devices: Dict[str, Device] = self._load_inventory()
         self.sessions: Dict[str, ConnectHandler] = {}
@@ -98,23 +99,62 @@ class NetworkManager:
         Raises:
             ValueError: If validation fails
         """
+        self._validate_device_fields(dev_data)
+        self._validate_device_type(dev_data)
+        self._validate_hostname_format(dev_data)
+
+    def _validate_device_fields(self, dev_data: dict) -> None:
+        """Validates that all required fields are present in the device data.
+
+        Args:
+            dev_data: Device information from the inventory
+
+        Raises:
+            ValueError: If missing required fields
+        """
         # Validate required fields exist
         required_fields = ["name", "hostname", "username", "password", "device_type"]
         for field in required_fields:
             if field not in dev_data or not dev_data[field]:
-                raise ValueError(f"Missing required field '{field}' in device inventory")
+                raise ValueError(
+                    f"Missing required field '{field}' in device inventory"
+                )
 
+    def _validate_device_type(self, dev_data: dict) -> None:
+        """Validates the device type against known netmiko device types.
+
+        Args:
+            dev_data: Device information from the inventory
+        """
         # Validate device type (connection type in the context of netmiko)
         device_type = dev_data.get("device_type", "").lower()
         # Common valid netmiko device types
         valid_device_types = [
-            "cisco_ios", "cisco_xe", "cisco_xr", "cisco_nxos",
-            "juniper_junos", "arista_eos", "hp_procurve", "hp_comware",
-            "huawei", "nokia_sros", "fortinet", "paloalto_panos"
+            "cisco_ios",
+            "cisco_xe",
+            "cisco_xr",
+            "cisco_nxos",
+            "juniper_junos",
+            "arista_eos",
+            "hp_procurve",
+            "hp_comware",
+            "huawei",
+            "nokia_sros",
+            "fortinet",
+            "paloalto_panos",
         ]
         if device_type not in valid_device_types:
             print(f"Warning: '{device_type}' is not a standard netmiko device type")
 
+    def _validate_hostname_format(self, dev_data: dict) -> None:
+        """Validates the hostname format as IP or valid hostname.
+
+        Args:
+            dev_data: Device information from the inventory
+
+        Raises:
+            ValueError: If hostname format is invalid
+        """
         # Validate IP address format
         hostname = dev_data.get("hostname")
         if hostname:
@@ -123,9 +163,11 @@ class NetworkManager:
                 ipaddress.ip_address(hostname)
             except ValueError:
                 # If it's not a valid IP, check if it's a valid hostname format
-                hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.?$'
+                hostname_pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.?$"
                 if not re.match(hostname_pattern, hostname):
-                    raise ValueError(f"Invalid IP address or hostname format: {hostname}")
+                    raise ValueError(
+                        f"Invalid IP address or hostname format: {hostname}"
+                    ) from None
 
     def get_device(self, device_name: str) -> Optional[Device]:
         """Retrieves a device by its name.
@@ -177,6 +219,31 @@ class NetworkManager:
                 f"Execution blocked for potentially dangerous command: {command}"
             )
 
+        session = self._get_or_create_session(device)
+        try:
+            output = session.send_command(command, read_timeout=20)
+            return self._sanitize_output(output)
+        except NetmikoTimeoutException:
+            raise ValueError(
+                f"Timeout executing command '{command}' on device {device.name}"
+            ) from None
+        except Exception as e:
+            raise ValueError(
+                f"Error executing command '{command}' on device {device.name}: {e}"
+            ) from e
+
+    def _get_or_create_session(self, device: Device) -> ConnectHandler:
+        """Gets an existing Netmiko session or creates a new one if needed.
+
+        Args:
+            device: The device object to connect to
+
+        Returns:
+            The Netmiko session (ConnectHandler instance)
+
+        Raises:
+            ValueError: If connection fails
+        """
         if device.name not in self.sessions:
             try:
                 self.sessions[device.name] = ConnectHandler(
@@ -187,23 +254,22 @@ class NetworkManager:
                     timeout=10,
                 )
             except NetmikoTimeoutException:
-                raise ValueError(f"Timeout connecting to device {device.name}")
+                raise ValueError(
+                    f"Timeout connecting to device {device.name}"
+                ) from None
             except NetmikoAuthenticationException:
-                raise ValueError(f"Authentication failed for device {device.name}")
+                raise ValueError(
+                    f"Authentication failed for device {device.name}"
+                ) from None
             except Exception as e:
-                raise ValueError(f"Failed to connect to device {device.name}: {e}")
+                raise ValueError(
+                    f"Failed to connect to device {device.name}: {e}"
+                ) from e
 
-        session = self.sessions[device.name]
-        try:
-            output = session.send_command(command, read_timeout=20)
-            return self._sanitize_output(output)
-        except NetmikoTimeoutException:
-            raise ValueError(f"Timeout executing command '{command}' on device {device.name}")
-        except Exception as e:
-            raise ValueError(f"Error executing command '{command}' on device {device.name}: {e}")
+        return self.sessions[device.name]
 
     # Cache compiled regex patterns to avoid recompilation
-    _DANGEROUS_PATTERNS_COMPILED = [
+    _DANGEROUS_PATTERNS_COMPILED: ClassVar[list] = [
         re.compile(r"write\s+erase", re.IGNORECASE),
         re.compile(r"reload", re.IGNORECASE),
         re.compile(r"delete", re.IGNORECASE),
@@ -212,14 +278,18 @@ class NetworkManager:
         re.compile(r"no\s+shutdown", re.IGNORECASE),
         re.compile(r"clear", re.IGNORECASE),
         re.compile(r"tclsh", re.IGNORECASE),  # Prevent scripting execution
-        re.compile(r"bash", re.IGNORECASE),   # Prevent shell access on some devices
+        re.compile(r"bash", re.IGNORECASE),  # Prevent shell access on some devices
         re.compile(r"enable\s+secret", re.IGNORECASE),
         re.compile(r"username.*secret", re.IGNORECASE),
         re.compile(r"service.*password", re.IGNORECASE),
         # Patterns with potential for command injection - be more specific with shell separators
         # Only block ; and & as dangerous, allow | as it's commonly used in network commands
-        re.compile(r"^[;&]", re.IGNORECASE),  # Shell command separators at start (excluding pipe)
-        re.compile(r"[;&][;&|]", re.IGNORECASE),  # Multiple separators starting with ; or &
+        re.compile(
+            r"^[;&]", re.IGNORECASE
+        ),  # Shell command separators at start (excluding pipe)
+        re.compile(
+            r"[;&][;&|]", re.IGNORECASE
+        ),  # Multiple separators starting with ; or &
         re.compile(r"[;&]\s*[;&|]", re.IGNORECASE),  # Multiple separators with space
     ]
 
@@ -238,14 +308,16 @@ class NetworkManager:
 
         # Additional validation: check for potentially encoded dangerous commands
         # Convert common substitutions back to check for dangerous patterns
-        deobfuscated_command = command_lower
+        sanitized_command = command_lower
         # Common character substitutions in commands (e.g., "w r i t e" for "write")
-        deobfuscated_command = re.sub(r'\s+', '', deobfuscated_command)  # Remove internal spaces
+        sanitized_command = re.sub(
+            r"\s+", "", sanitized_command
+        )  # Remove internal spaces
         # Add more deobfuscation patterns as needed
 
-        # Check both original and deobfuscated versions
+        # Check both original and sanitized versions
         return any(
-            pattern.search(command_lower) or pattern.search(deobfuscated_command)
+            pattern.search(command_lower) or pattern.search(sanitized_command)
             for pattern in self._DANGEROUS_PATTERNS_COMPILED
         )
 
@@ -261,13 +333,13 @@ class NetworkManager:
             str: Sanitized output with sensitive information redacted.
         """
         # Simplified for brevity; a production version would be more robust.
-        result = re.sub(
+        output = re.sub(
             r"password\s+\S+", "password [REDACTED]", output, flags=re.IGNORECASE
         )
-        result = re.sub(
-            r"secret\s+\S+", "secret [REDACTED]", result, flags=re.IGNORECASE
+        output = re.sub(
+            r"secret\s+\S+", "secret [REDACTED]", output, flags=re.IGNORECASE
         )
-        return result
+        return output
 
     def close_all_sessions(self):
         """Closes all active Netmiko sessions.

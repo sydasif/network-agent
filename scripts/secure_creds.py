@@ -8,33 +8,35 @@ This script provides a secure way to manage credentials by:
 3. Providing guidance on secure credential storage
 """
 
-import os
 import sys
-from pathlib import Path
 import yaml
 import json
 from getpass import getpass
 import base64
 from cryptography.fernet import Fernet
 
+
 def generate_key():
     """Generate a key for encryption/decryption."""
     return Fernet.generate_key()
+
 
 def encrypt_data(data, key):
     """Encrypt data using the provided key."""
     f = Fernet(key)
     return f.encrypt(data.encode())
 
+
 def decrypt_data(encrypted_data, key):
     """Decrypt data using the provided key."""
     f = Fernet(key)
     return f.decrypt(encrypted_data).decode()
 
+
 def create_secure_inventory():
     """Create an encrypted inventory file or update the existing one to use environment variables."""
     print("Creating secure inventory configuration...")
-    
+
     # Load existing inventory
     try:
         with open("inventory.yaml", "r") as f:
@@ -50,56 +52,65 @@ def create_secure_inventory():
                     "password": "${DEVICE_PASSWORD_D1}",
                     "device_type": "cisco_ios",
                     "role": "distribution",
-                    "connection_protocol": "netmiko"
+                    "connection_protocol": "netmiko",
                 }
             ]
         }
-    
+
     # Update inventory to use environment variables
     for device in inventory_data.get("devices", []):
         device["username"] = f"${{DEVICE_USERNAME_{device['name']}}}"
         device["password"] = f"${{DEVICE_PASSWORD_{device['name']}}}"
-    
+
     # Save updated inventory
     with open("secure_inventory.yaml", "w") as f:
         yaml.dump(inventory_data, f, default_flow_style=False)
-    
+
     print("Updated inventory to use environment variables in secure_inventory.yaml")
     print("Remember to set these environment variables before running the application.")
+
 
 def create_secure_env():
     """Create a secure .env file with encrypted values."""
     print("\nCreating secure .env file...")
-    
+
     # Get sensitive values
     groq_api_key = getpass("Enter your GROQ API key (will not be displayed): ")
-    mistral_api_key = getpass("Enter your Mistral API key (will not be displayed, press Enter to skip): ") or None
-    
+    mistral_api_key = (
+        getpass(
+            "Enter your Mistral API key (will not be displayed, press Enter to skip): "
+        )
+        or None
+    )
+
     # Generate encryption key
     key = generate_key()
-    
+
     # Create encrypted environment file
     env_content = {
         "GROQ_API_KEY": base64.b64encode(encrypt_data(groq_api_key, key)).decode(),
     }
-    
+
     if mistral_api_key:
-        env_content["MISTRAL_API_KEY"] = base64.b64encode(encrypt_data(mistral_api_key, key)).decode()
-    
+        env_content["MISTRAL_API_KEY"] = base64.b64encode(
+            encrypt_data(mistral_api_key, key)
+        ).decode()
+
     # Save encrypted values to .env file
     with open(".env.encrypted", "w") as f:
         json.dump(env_content, f, indent=2)
-    
+
     # Save key separately (in a real application, this should be stored more securely)
     with open(".env.key", "wb") as f:
         f.write(key)
-    
+
     print("\nEncrypted environment file created as .env.encrypted")
     print("Encryption key saved as .env.key")
     print("\nTo use these values in your application, you'll need to:")
     print("1. Create a custom configuration loader that decrypts these values")
     print("2. Add '.env.encrypted' and '.env.key' to your .gitignore file")
     print("3. Store the key in a secure location (preferably external)")
+
 
 def update_config_for_encryption():
     """Update the config module to handle encrypted credentials."""
@@ -142,21 +153,24 @@ class Settings(BaseSettings):
 settings = Settings()
     """)
 
+
 def main():
     print("AI Network Agent - Secure Credential Setup Tool")
     print("=" * 50)
     print("This tool helps you securely manage credentials for the network agent.")
     print()
-    
+
     while True:
         print("\nOptions:")
-        print("1. Create secure inventory (convert hardcoded credentials to environment variables)")
+        print(
+            "1. Create secure inventory (convert hardcoded credentials to environment variables)"
+        )
         print("2. Create encrypted .env file for API keys")
         print("3. Show example config changes for encrypted credentials")
         print("4. Exit")
-        
+
         choice = input("\nSelect an option (1-4): ").strip()
-        
+
         if choice == "1":
             create_secure_inventory()
         elif choice == "2":
@@ -168,21 +182,24 @@ def main():
             break
         else:
             print("Invalid choice. Please select 1-4.")
-    
+
     print("\nSecurity best practices:")
     print("- Never commit .env files or encryption keys to version control")
     print("- Use proper access controls for credential files")
-    print("- Consider using a secrets management service (AWS Secrets Manager, HashiCorp Vault, etc.)")
+    print(
+        "- Consider using a secrets management service (AWS Secrets Manager, HashiCorp Vault, etc.)"
+    )
     print("- Regularly rotate credentials")
+
 
 if __name__ == "__main__":
     # Check if required packages are available
     try:
         import yaml
-        import cryptography
+        from cryptography.fernet import Fernet
     except ImportError as e:
         print(f"Missing required package: {e}")
         print("Please install required packages: pip install pyyaml cryptography")
         sys.exit(1)
-    
+
     main()

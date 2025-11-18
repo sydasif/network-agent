@@ -5,17 +5,16 @@ commands: 'chat' for interactive sessions and 'analyze' for on-demand network he
 analysis. It handles environment loading, initializes the system components,
 and orchestrates the entire workflow from user input to response generation.
 """
+
 import os
 from pathlib import Path
 from functools import lru_cache
 import typer
-import yaml
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage
 from src.graph.workflow import NetworkWorkflow
 from src.tools.inventory import network_manager
 from src.core.config import settings
-from src.core.state_manager import StateManager
 from src.agents.analyzer import ProactiveAnalyzer
 
 
@@ -42,10 +41,11 @@ def chat():
         return
 
     if not Path(settings.inventory_file).exists():
-        print(f"⚠️ Inventory file '{settings.inventory_file}' not found. Please create one.")
+        print(
+            f"⚠️ Inventory file '{settings.inventory_file}' not found. Please create one."
+        )
         return
     print(f"📦 Inventory loaded: {len(network_manager.devices)} devices found.")
-
 
     try:
         workflow = NetworkWorkflow(api_key=groq_api_key)
@@ -99,10 +99,13 @@ def _get_cached_health_checks():
     # Default set of health checks that were previously in command.yaml
     return [
         {"command": "show version", "description": "Device version and status"},
-        {"command": "show interfaces", "description": "Interface status and statistics"},
+        {
+            "command": "show interfaces",
+            "description": "Interface status and statistics",
+        },
         {"command": "show ip route", "description": "Routing table information"},
         {"command": "show processes cpu", "description": "CPU utilization"},
-        {"command": "show memory", "description": "Memory utilization"}
+        {"command": "show memory", "description": "Memory utilization"},
     ]
 
 
@@ -124,7 +127,6 @@ def analyze():
         print("⚠️ GROQ_API_KEY not set!")
         return
 
-    state_manager = StateManager()
     analyzer = ProactiveAnalyzer(api_key=groq_api_key)
 
     health_checks = _get_cached_health_checks()
@@ -133,37 +135,66 @@ def analyze():
         print("❌ No health checks defined. Exiting.")
         return
 
-    print(f"📈 Analyzing {len(network_manager.devices)} devices with {len(health_checks)} checks...")
+    print(
+        f"📈 Analyzing {len(network_manager.devices)} devices with {len(health_checks)} checks..."
+    )
     print("-" * 40)
 
+    _execute_health_analysis(analyzer, health_checks)
+
+    print("✅ Analysis complete.")
+
+
+def _execute_health_analysis(analyzer: ProactiveAnalyzer, health_checks: list):
+    """Execute the health analysis for all devices and health checks.
+
+    Args:
+        analyzer: The ProactiveAnalyzer instance to use for analysis
+        health_checks: List of health checks to perform
+    """
     try:
         for device in network_manager.devices.values():
             print(f"Device: {device.name}")
-            for check in health_checks:
-                command = check["command"]
-                try:
-                    current_output = network_manager.execute_command(device.name, command)
-                    current_state = {"output": current_output}
-
-                    # Use the analyzer's built-in snapshot storage functionality
-                    analysis = analyzer.analyze_with_snapshot_storage(device.name, command, current_state)
-                    significance = analysis['significance']
-                    summary = analysis['summary']
-                    print(f"  - Check '{command}': [{significance}] {summary}")
-
-                except KeyboardInterrupt:
-                    print("\n⚠️  Analysis interrupted by user. Cleaning up connections...")
-                    network_manager.close_all_sessions()
-                    print("❌ Analysis interrupted.")
-                    return  # Exit the function early
-                except Exception as e:
-                    print(f"  - Check '{command}': [Error] {e}")
-        print("✅ Analysis complete.")
+            _analyze_device(device, analyzer, health_checks)
+    except KeyboardInterrupt:
+        print("\n⚠️  Analysis interrupted by user. Cleaning up connections...")
+        network_manager.close_all_sessions()
+        print("❌ Analysis interrupted.")
+        return  # Exit the function early
     finally:
         # Ensure sessions are closed on all paths (success, error, or interrupt)
         network_manager.close_all_sessions()
 
 
+def _analyze_device(device, analyzer: ProactiveAnalyzer, health_checks: list):
+    """Analyze a single device with all health checks.
+
+    Args:
+        device: The device to analyze
+        analyzer: The ProactiveAnalyzer instance to use for analysis
+        health_checks: List of health checks to perform
+    """
+    for check in health_checks:
+        command = check["command"]
+        try:
+            current_output = network_manager.execute_command(device.name, command)
+            current_state = {"output": current_output}
+
+            # Use the analyzer's built-in snapshot storage functionality
+            analysis = analyzer.analyze_with_snapshot_storage(
+                device.name, command, current_state
+            )
+            significance = analysis["significance"]
+            summary = analysis["summary"]
+            print(f"  - Check '{command}': [{significance}] {summary}")
+
+        except KeyboardInterrupt:
+            print("\n⚠️  Analysis interrupted by user. Cleaning up connections...")
+            network_manager.close_all_sessions()
+            print("❌ Analysis interrupted.")
+            return  # Exit the function early
+        except Exception as e:
+            print(f"  - Check '{command}': [Error] {e}")
 
 
 if __name__ == "__main__":

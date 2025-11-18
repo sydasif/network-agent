@@ -38,42 +38,80 @@ def tool_executor(plan: List[Dict[str, Any]]) -> List[Any]:
         be either the output of the tool or an error message string if the tool
         execution failed or if the tool name is unknown.
     """
-    # Detect if the plan is in the new format with "steps" key
-    if isinstance(plan, dict) and "steps" in plan:
-        steps = plan.get("steps", [])
-    else:
-        # Assume it's the old format - a list of steps
-        steps = plan if isinstance(plan, list) else []
-
+    steps = _extract_steps_from_plan(plan)
     results = []
+
     for step in steps:
         tool_name = step.get("tool")
         tool_args = step.get("args", {})
 
-        if tool_name in TOOLS:
-            tool_function = TOOLS[tool_name]
-            try:
-                # Check if the tool is a LangChain tool or a regular Python function
-                if isinstance(tool_function, BaseTool):
-                    result = tool_function.invoke(tool_args)
-                else:
-                    # For regular Python functions, call directly with the arguments
-                    result = tool_function(**tool_args)
-
-                # Clean double layered output by flattening nested result structures
-                # If result has a 'result' key containing another 'result', flatten it
-                if isinstance(result, dict) and "result" in result:
-                    if isinstance(result["result"], dict) and "result" in result["result"]:
-                        # Double nested: {"result": {"result": "actual_output"}}
-                        result = result["result"]["result"]
-                    elif isinstance(result["result"], (str, int, float, bool, list, dict)):
-                        # Single nested: {"result": "actual_output"}
-                        result = result["result"]
-
-                results.append(result)
-            except Exception as e:
-                results.append(f"Error executing tool {tool_name}: {e}")
-        else:
-            results.append(f"Unknown tool: {tool_name}")
+        result = _execute_single_step(tool_name, tool_args)
+        results.append(result)
 
     return results
+
+
+def _extract_steps_from_plan(plan: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Extracts the list of steps from the plan, handling different format variants.
+
+    Args:
+        plan: The plan which may be a list of steps or a dict with 'steps' key
+
+    Returns:
+        A list of step dictionaries
+    """
+    # Detect if the plan is in the new format with "steps" key
+    if isinstance(plan, dict) and "steps" in plan:
+        return plan.get("steps", [])
+    # Assume it's the old format - a list of steps
+    return plan if isinstance(plan, list) else []
+
+
+def _execute_single_step(tool_name: str, tool_args: Dict[str, Any]) -> Any:
+    """Executes a single tool step.
+
+    Args:
+        tool_name: The name of the tool to execute
+        tool_args: The arguments to pass to the tool
+
+    Returns:
+        The result of the tool execution or an error message
+    """
+    if tool_name not in TOOLS:
+        return f"Unknown tool: {tool_name}"
+
+    tool_function = TOOLS[tool_name]
+    try:
+        # Check if the tool is a LangChain tool or a regular Python function
+        if isinstance(tool_function, BaseTool):
+            result = tool_function.invoke(tool_args)
+        else:
+            # For regular Python functions, call directly with the arguments
+            result = tool_function(**tool_args)
+
+        # Clean double layered output by flattening nested result structures
+        # If result has a 'result' key containing another 'result', flatten it
+        return _flatten_nested_result(result)
+
+    except Exception as e:
+        return f"Error executing tool {tool_name}: {e}"
+
+
+def _flatten_nested_result(result: Any) -> Any:
+    """Flattens nested result structures by extracting nested 'result' values.
+
+    Args:
+        result: The result to flatten
+
+    Returns:
+        The flattened result
+    """
+    if isinstance(result, dict) and "result" in result:
+        if isinstance(result["result"], dict) and "result" in result["result"]:
+            # Double nested: {"result": {"result": "actual_output"}}
+            return result["result"]["result"]
+        if isinstance(result["result"], (str, int, float, bool, list, dict)):
+            # Single nested: {"result": "actual_output"}
+            return result["result"]
+
+    return result

@@ -4,12 +4,14 @@ This module implements the StateManager class which handles the storage and retr
 of device state snapshots. It provides functionality to save and retrieve network
 device states over time, enabling the Proactive Analyzer to detect changes.
 """
+
 import sqlite3
 import json
 from datetime import datetime
-from typing import Optional, ContextManager
+from typing import Optional
 from contextlib import contextmanager
 from src.core.config import settings
+
 
 class StateManager:
     """Manages persistent storage of device state snapshots using SQLite.
@@ -75,7 +77,7 @@ class StateManager:
             # Using parameterized queries to prevent SQL injection
             cursor.execute(
                 "INSERT INTO device_snapshots (timestamp, device_name, command, data) VALUES (?, ?, ?, ?)",
-                (timestamp, device_name, command, json.dumps(data))
+                (timestamp, device_name, command, json.dumps(data)),
             )
             conn.commit()
 
@@ -98,7 +100,7 @@ class StateManager:
             # Using parameterized queries to prevent SQL injection
             cursor.execute(
                 "SELECT data FROM device_snapshots WHERE device_name = ? AND command = ? ORDER BY timestamp DESC LIMIT 1",
-                (device_name, command)
+                (device_name, command),
             )
             row = cursor.fetchone()
             return json.loads(row[0]) if row else None

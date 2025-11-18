@@ -55,27 +55,45 @@ class CommandOutput(BaseModel):
 
 # --- NLP Models ---
 
+
 class ExtractedEntities(BaseModel):
     """Entities extracted from the user's network query."""
-    device_names: List[str] = Field(default_factory=list, description="List of device hostnames mentioned (e.g., 'S1', 'R1').")
-    interfaces: List[str] = Field(default_factory=list, description="List of interface names (e.g., 'GigabitEthernet0/1').")
-    protocols: List[str] = Field(default_factory=list, description="List of protocols (e.g., 'bgp', 'ospf').")
-    ip_addresses: List[str] = Field(default_factory=list, description="List of IP addresses found.")
-    vlans: List[str] = Field(default_factory=list, description="List of VLAN IDs found.")
+
+    device_names: List[str] = Field(
+        default_factory=list,
+        description="List of device hostnames mentioned (e.g., 'S1', 'R1').",
+    )
+    interfaces: List[str] = Field(
+        default_factory=list,
+        description="List of interface names (e.g., 'GigabitEthernet0/1').",
+    )
+    protocols: List[str] = Field(
+        default_factory=list, description="List of protocols (e.g., 'bgp', 'ospf')."
+    )
+    ip_addresses: List[str] = Field(
+        default_factory=list, description="List of IP addresses found."
+    )
+    vlans: List[str] = Field(
+        default_factory=list, description="List of VLAN IDs found."
+    )
+
 
 class UserIntent(BaseModel):
     """
     Analyze the user's network query and extract structured information.
     """
-    intent: Literal["get_status", "get_config", "find_device", "greeting", "ping", "unknown"] = Field(
-        ..., description="The primary goal of the user."
-    )
+
+    intent: Literal[
+        "get_status", "get_config", "find_device", "greeting", "ping", "unknown"
+    ] = Field(..., description="The primary goal of the user.")
     entities: ExtractedEntities = Field(
         ..., description="All named entities recognized in the query."
     )
     is_ambiguous: bool = Field(
-        False, description="True if the user asks for status/config but specifies no device."
+        False,
+        description="True if the user asks for status/config but specifies no device.",
     )
     sentiment: Literal["normal", "urgent"] = Field(
-        "normal", description="Urgent if words like 'down', 'critical', or 'emergency' are used."
+        "normal",
+        description="Urgent if words like 'down', 'critical', or 'emergency' are used.",
     )

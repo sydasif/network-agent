@@ -29,7 +29,9 @@ def validate_inventory(device_info: dict) -> None:
         ValueError: If validation fails
     """
     # Validate connection type
-    connection = device_info.get("device_type", "")  # Using device_type as the connection type
+    connection = device_info.get(
+        "device_type", ""
+    )  # Using device_type as the connection type
     # Netmiko device types are what we use, so we validate against known types
     if not connection:
         raise ValueError("Missing device_type in inventory")
@@ -41,9 +43,11 @@ def validate_inventory(device_info: dict) -> None:
             ipaddress.ip_address(ip)
         except Exception:
             # Check if it's a valid hostname (not just IP)
-            import re
-            if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9])*$', ip):
-                raise ValueError("Invalid IP address or hostname format")
+            if not re.match(
+                r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9])*$",
+                ip,
+            ):
+                raise ValueError("Invalid IP address or hostname format") from None
 
 
 @tool
