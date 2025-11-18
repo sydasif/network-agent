@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+**⚠️ SECURITY NOTICE: This project requires security hardening before production use. See SECURITY.md for details.**
+
 An intelligent, NLP-powered network operations co-pilot designed to bridge the gap between natural language and network device management. This agent enables network administrators to diagnose and troubleshoot network issues using everyday language instead of complex CLI commands.
 
 ## ✨ Key Features

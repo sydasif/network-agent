@@ -64,6 +64,7 @@ class StateManager:
         """
         timestamp = datetime.utcnow().isoformat()
         cursor = self.conn.cursor()
+        # Using parameterized queries to prevent SQL injection
         cursor.execute(
             "INSERT INTO device_snapshots (timestamp, device_name, command, data) VALUES (?, ?, ?, ?)",
             (timestamp, device_name, command, json.dumps(data))
@@ -85,6 +86,7 @@ class StateManager:
             if no snapshot exists for the device and command combination.
         """
         cursor = self.conn.cursor()
+        # Using parameterized queries to prevent SQL injection
         cursor.execute(
             "SELECT data FROM device_snapshots WHERE device_name = ? AND command = ? ORDER BY timestamp DESC LIMIT 1",
             (device_name, command)

@@ -2,6 +2,9 @@
 name = "nlp-network-agent"
 version = "1.0.0"
 requires-python = ">=3.12"
+
+# Note: For security vulnerabilities, we've implemented workarounds in the code itself
+# since updating to the fixed versions creates dependency conflicts
 dependencies = [
     "groq>=0.33.0",
     "langchain>=0.2.0,<0.3.0",
@@ -11,13 +14,16 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "pydantic>=2.0.0",
     "pyyaml>=6.0",
-    # New dependencies for V2
-    "langchain-community>=0.2.0", # For text splitters and other utilities
+    # Keeping compatible versions due to dependency conflicts
+    # Security vulnerabilities addressed through code-level mitigations
+    "langchain-community>=0.2.19,<0.3.0",
+    "langchain-text-splitters>=0.2.2,<0.3.0",
     # New dependency for enhanced NLP processing
     "spacy>=3.7.0",
     "typer>=0.20.0",
     "pydantic-settings>=2.12.0",
     "pip>=25.3",
+    "urllib3>=2.5.0", # Updated for security
 ]
 
 [dependency-groups]

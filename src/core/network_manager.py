@@ -183,6 +183,15 @@ class NetworkManager:
         re.compile(r"delete", re.IGNORECASE),
         re.compile(r"format", re.IGNORECASE),
         re.compile(r"configure\s+terminal", re.IGNORECASE),
+        re.compile(r"no\s+shutdown", re.IGNORECASE),
+        re.compile(r"clear", re.IGNORECASE),
+        re.compile(r"tclsh", re.IGNORECASE),  # Prevent scripting execution
+        re.compile(r"bash", re.IGNORECASE),   # Prevent shell access on some devices
+        re.compile(r"enable\s+secret", re.IGNORECASE),
+        re.compile(r"username.*secret", re.IGNORECASE),
+        re.compile(r"service.*password", re.IGNORECASE),
+        # Patterns with potential for command injection
+        re.compile(r"[;&|]", re.IGNORECASE),  # Shell command separators
     ]
 
     def _is_dangerous_command(self, command: str) -> bool:
@@ -197,7 +206,19 @@ class NetworkManager:
             bool: True if the command is dangerous, False otherwise.
         """
         command_lower = command.lower().strip()
-        return any(pattern.search(command_lower) for pattern in self._DANGEROUS_PATTERNS_COMPILED)
+
+        # Additional validation: check for potentially encoded dangerous commands
+        # Convert common substitutions back to check for dangerous patterns
+        deobfuscated_command = command_lower
+        # Common character substitutions in commands (e.g., "w r i t e" for "write")
+        deobfuscated_command = re.sub(r'\s+', '', deobfuscated_command)  # Remove internal spaces
+        # Add more deobfuscation patterns as needed
+
+        # Check both original and deobfuscated versions
+        return any(
+            pattern.search(command_lower) or pattern.search(deobfuscated_command)
+            for pattern in self._DANGEROUS_PATTERNS_COMPILED
+        )
 
     def _sanitize_output(self, output: str) -> str:
         """Removes sensitive information from CLI output.
