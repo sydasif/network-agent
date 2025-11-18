@@ -7,6 +7,8 @@ execution plans), Tool Executor (which executes the plans), and a Generator agen
 multi-agent system to generate appropriate responses.
 """
 
+import json
+import re
 from typing import List, TypedDict
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
@@ -122,8 +124,55 @@ class NetworkWorkflow:
         """Classify intent using the structured LLM."""
         print(f"🔍 Analyzing: {state['input']}")
 
-        # One line to do all the NLP work
-        intent = self.intent_classifier.invoke(state['input'])
+        query = state['input'].strip().lower()
+
+        # Handle simple cases before attempting structured output
+        if query in ["hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening", "good night"]:
+            from src.core.models import ExtractedEntities
+            intent = UserIntent(intent="greeting", entities=ExtractedEntities(), is_ambiguous=False)
+            return {
+                "structured_intent": intent,
+                "response": "Hello! I'm your network assistant. How can I help?",
+                "plan": []
+            }
+
+        try:
+            # One line to do all the NLP work
+            intent = self.intent_classifier.invoke(state['input'])
+        except Exception as e:
+            # If the structured output fails, attempt to extract basic information manually
+            print(f"⚠️ Structured output failed, using fallback: {e}")
+            # For simple cases, create a default intent
+            from src.core.models import ExtractedEntities
+            intent = UserIntent(
+                intent="unknown",
+                entities=ExtractedEntities(),
+                is_ambiguous=False
+            )
+
+            # Try to detect basic intent patterns
+            if any(word in query for word in ["hi", "hello", "hey", "greetings"]):
+                intent.intent = "greeting"
+            elif any(word in query for word in ["ping"]):
+                intent.intent = "ping"
+                # Try to extract IP addresses using basic regex
+                ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
+                ip_matches = re.findall(ip_pattern, state['input'])
+                intent.entities.ip_addresses = ip_matches
+
+        # Quick routing checks based on intent - return early for simple queries to avoid planner issues
+        if intent.intent == "greeting":
+            return {
+                "structured_intent": intent,
+                "response": "Hello! I'm your network assistant. How can I help?",
+                "plan": []
+            }
+        if intent.is_ambiguous:
+            return {
+                "structured_intent": intent,
+                "response": "Could you please specify which device you are referring to?",
+                "plan": []
+            }
 
         # Optional: Simple logic to inject available devices if needed for context
         # (The LLM usually figures it out, but you can add context to the prompt if needed)

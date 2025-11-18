@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     """
 
     inventory_file: str = "inventory.yaml"
-    groq_model_name: str = "llama-3.1-8b-instant"  # Updated to a current model
+    groq_model_name: str = "openai/gpt-oss-20b"  # Updated to a current model
     groq_temperature: float = 0.7
     groq_api_key: str = ""
     state_database_file: str = "agent_state.db"

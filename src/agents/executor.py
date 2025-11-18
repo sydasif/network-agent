@@ -9,11 +9,13 @@ from typing import List, Dict, Any
 from langchain_core.tools import BaseTool
 from src.tools.inventory import inventory_search
 from src.tools.executor import run_network_command
+from src.tools.ping_tool import ping_host
 
 # Map tool names to their functions
 TOOLS = {
     "inventory_search": inventory_search,
     "run_network_command": run_network_command,
+    "ping_host": ping_host,
 }
 
 

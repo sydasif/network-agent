@@ -67,7 +67,7 @@ class UserIntent(BaseModel):
     """
     Analyze the user's network query and extract structured information.
     """
-    intent: Literal["get_status", "get_config", "find_device", "greeting", "unknown"] = Field(
+    intent: Literal["get_status", "get_config", "find_device", "greeting", "ping", "unknown"] = Field(
         ..., description="The primary goal of the user."
     )
     entities: ExtractedEntities = Field(
