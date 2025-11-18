@@ -1,31 +1,45 @@
-# Network Device Inventory - V2
-# Format: YAML
+# Network Device Inventory - Example
 
 devices:
   # Distribution Switches
-  - name: S1
+  - name: D1
     hostname: 192.168.121.101
     username: admin
     password: admin
     device_type: cisco_ios
-    description: Floor 1 Distribution Switch
     role: distribution
-    connection_protocol: netmiko # New field
+    connection_protocol: netmiko
 
-  - name: S2
+  - name: D2
     hostname: 192.168.121.102
     username: admin
     password: admin
     device_type: cisco_ios
-    description: Floor 2 Distribution Switch
     role: distribution
-    connection_protocol: netmiko # New field
+    connection_protocol: netmiko
 
-  - name: core-router-gnmi
-    hostname: 10.0.0.1
-    username: cisco
-    password: cisco
-    device_type: cisco_xr
-    description: Core router with gNMI support
-    role: core
-    connection_protocol: gnmi # Example for a modern device
+  # Access Switches
+  - name: S1
+    hostname: 192.168.121.103
+    username: admin
+    password: admin
+    device_type: cisco_ios
+    role: access
+    connection_protocol: netmiko
+
+  - name: S2
+    hostname: 192.168.121.103
+    username: admin
+    password: admin
+    device_type: cisco_ios
+    role: access
+    connection_protocol: netmiko
+
+  # - name: core-router-gnmi
+  #   hostname: 10.0.0.1
+  #   username: cisco
+  #   password: cisco
+  #   device_type: cisco_xr
+  #   description: Core router with gNMI support
+  #   role: core
+  #   connection_protocol: gnmi # Example for a modern device

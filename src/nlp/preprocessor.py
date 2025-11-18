@@ -1,8 +1,18 @@
 """
 NLP Pre-processing Layer using spaCy.
-This pre-processor is SELF-CONFIGURING. It dynamically builds its rules
-by reading the command.yaml file, ensuring the NLP layer is
-always in sync with the agent's capabilities.
+
+This module implements an NLP pre-processor that classifies user intent and extracts
+named entities from natural language queries. The pre-processor is self-configuring,
+dynamically building its rules from the command.yaml file to ensure it stays in sync
+with the agent's capabilities.
+
+The pre-processor uses spaCy for natural language understanding and includes:
+- Intent classification based on keyword matching
+- Entity extraction for devices, interfaces, protocols, and keywords
+- Dynamic rule loading from configuration files
+- Interface pattern recognition for network equipment
+
+This approach allows the NLP layer to be always in sync with the agent's capabilities.
 """
 import spacy
 import yaml
@@ -13,10 +23,33 @@ from src.tools.inventory import network_manager
 from src.core.config import settings
 
 class NLPPreprocessor:
+    """NLP pre-processor for classifying user intent and extracting entities.
+
+    This class processes natural language queries from users, classifying the intent
+    (e.g., get_status, get_config) and extracting relevant entities (device names,
+    interfaces, protocols). The pre-processor is self-configuring, dynamically
+    building its rules from the command.yaml file.
+
+    Attributes:
+        nlp: The spaCy NLP model instance.
+        intent_rules (Dict[str, List[str]]): Mapping of intents to keyword lists.
+        phrase_matcher: spaCy PhraseMatcher for entity recognition.
+        matcher: spaCy Matcher for pattern-based matching.
+    """
+
     def __init__(self, template_file: str = "command.yaml"):
-        """
-        Initializes the spaCy model and dynamically builds intent rules and
-        entity matchers from the command template file.
+        """Initializes the NLP pre-processor with spaCy model and dynamic rules.
+
+        The constructor loads the spaCy model and dynamically builds intent rules
+        and entity matchers from the command template file. This ensures the NLP
+        layer stays synchronized with the agent's capabilities.
+
+        Args:
+            template_file (str): Path to the command template file (default: "command.yaml").
+
+        Raises:
+            OSError: If the spaCy model is not found.
+            FileNotFoundError: If the template file is not found.
         """
         try:
             self.nlp = spacy.load(settings.spacy_model)
@@ -72,6 +105,17 @@ class NLPPreprocessor:
         self.matcher.add("INTERFACE", [interface_pattern])
 
     def _classify_intent(self, doc) -> str:
+        """Classifies the intent of the user query based on keyword matching.
+
+        This method analyzes the processed spaCy document and determines the
+        user's intent by matching against the dynamically loaded intent rules.
+
+        Args:
+            doc: The processed spaCy document.
+
+        Returns:
+            str: The classified intent (e.g., 'get_status', 'get_config', 'unknown').
+        """
         # This logic remains the same, but its rules are now dynamic
         query_lower = doc.text.lower()
         for intent, keywords in self.intent_rules.items():
@@ -80,6 +124,17 @@ class NLPPreprocessor:
         return "unknown"
 
     def _extract_entities(self, doc) -> ExtractedEntities:
+        """Extracts named entities from the processed query document.
+
+        This method identifies and extracts various types of entities from the
+        spaCy document, including device names, interfaces, protocols, and keywords.
+
+        Args:
+            doc: The processed spaCy document.
+
+        Returns:
+            ExtractedEntities: An object containing all extracted entities.
+        """
         # This logic remains the same
         matches = self.matcher(doc) + self.phrase_matcher(doc)
         entities = ExtractedEntities(device_names=[], interfaces=[], protocols=[], keywords=[])
@@ -109,6 +164,18 @@ class NLPPreprocessor:
         return entities
 
     def process(self, query: str) -> UserIntent:
+        """Processes a natural language query and returns structured intent information.
+
+        This is the main method of the pre-processor, which analyzes a user's query
+        and returns a structured representation containing the intent, extracted
+        entities, and additional metadata.
+
+        Args:
+            query (str): The natural language query from the user.
+
+        Returns:
+            UserIntent: A structured representation of the user's intent and entities.
+        """
         # This logic remains the same
         doc = self.nlp(query)
         intent = self._classify_intent(doc)

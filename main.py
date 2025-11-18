@@ -1,4 +1,10 @@
-"""Main entry point for the AI Network Agent using Typer for a clean CLI."""
+"""Main entry point for the AI Network Agent using Typer for a clean CLI.
+
+This module serves as the entry point for the application and provides two main
+commands: 'chat' for interactive sessions and 'analyze' for on-demand network health
+analysis. It handles environment loading, initializes the system components,
+and orchestrates the entire workflow from user input to response generation.
+"""
 import os
 from pathlib import Path
 import typer
@@ -19,7 +25,13 @@ app = typer.Typer(help="AI Network Agent - NLP-First Co-pilot")
 
 @app.command()
 def chat():
-    """Starts an interactive chat session with the network agent."""
+    """Starts an interactive chat session with the network agent.
+
+    This command initializes the NLP preprocessor and network workflow,
+    then enters an interactive loop to process user queries. The process
+    involves NLP preprocessing, intent classification, and execution of
+    the appropriate agent workflow to generate responses.
+    """
     load_dotenv()
     print("🤖 AI Network Agent - Interactive Chat")
     print("=" * 60)
@@ -95,7 +107,13 @@ def chat():
 
 @app.command()
 def analyze():
-    """Runs a single, on-demand health analysis across all devices."""
+    """Runs a single, on-demand health analysis across all devices.
+
+    This command performs proactive health analysis by comparing current device
+    states with previously stored snapshots. It executes a series of predefined
+    health check commands and uses an LLM to analyze changes and determine
+    their operational significance (Critical, Warning, or Informational).
+    """
     load_dotenv()
     print("🤖 AI Network Agent - On-Demand Health Analysis")
     print("=" * 60)

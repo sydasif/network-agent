@@ -120,6 +120,40 @@ Run a single, on-demand health analysis across all devices:
 uv run python main.py analyze
 ```
 
+## 🛠️ Technical Architecture
+
+### Core Modules
+
+- **src.core.models**: Defines Pydantic data models for structured data contracts across the application
+- **src.core.config**: Centralized configuration settings using Pydantic Settings
+- **src.core.network_manager**: Manages inventory, connections, and command execution for network devices
+- **src.core.state_manager**: Manages persistent storage of device state snapshots using SQLite
+- **src.nlp.preprocessor**: NLP pre-processor for classifying user intent and extracting entities
+- **src.graph.workflow**: Implements the main LangGraph workflow with Planner, Executor, and Generator nodes
+- **src.agents**: Contains specific agent implementations (planner, executor, analyzer)
+- **src.tools**: Provides LangChain tools for inventory search and network command execution
+
+### Data Flow
+
+1. **Input Processing**: User queries are processed by the NLP preprocessor which returns structured intent containing:
+   - Query intent (get_status, get_config, find_device, etc.)
+   - Extracted entities (device names, interfaces, protocols)
+   - Sentiment analysis and ambiguity detection
+
+2. **Workflow Execution**: The NetworkWorkflow orchestrates:
+   - Planner node creates execution plan based on intent
+   - Executor node runs planned tool calls
+   - Generator node synthesizes results into human-readable response
+
+3. **State Management**: The StateManager persists device snapshots for change analysis
+
+### On-Demand Analysis
+
+The analysis feature compares current device states with historical snapshots to detect changes, categorizing them as:
+- Critical: Service-affecting changes (interface down, etc.)
+- Warning: Potential issues (increasing CPU, etc.)
+- Informational: Normal changes (uptime incrementing, etc.)
+
 ## 🚀 Future Roadmap
 
 - **Proactive Monitoring Service:** Evolve the `analyze` command into a continuously running service (daemon) that performs health checks on a schedule (e.g., every 15 minutes).
