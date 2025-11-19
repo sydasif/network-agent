@@ -1,38 +1,31 @@
-"""Main entry point for the AI Network Agent using Typer for a clean CLI.
+"""Simplified main entry point for the AI Network Agent using Typer for a clean CLI.
 
-This module serves as the entry point for the application and provides two main
-commands: 'chat' for interactive sessions and 'analyze' for on-demand network health
-analysis. It handles environment loading, initializes the system components,
-and orchestrates the entire workflow from user input to response generation.
+This module serves as the entry point for the simplified application, providing
+a 'chat' command for interactive sessions with the AI network agent.
 """
 
 import os
-from pathlib import Path
-from functools import lru_cache
 import typer
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, HumanMessage
-from src.graph.workflow import NetworkWorkflow
-from src.tools.inventory import network_manager
+from src.agents.simple_agent import SimpleNetworkAgent
 from src.core.config import settings
-from src.agents.analyzer import ProactiveAnalyzer
 
 
 # Create a Typer app
-app = typer.Typer(help="AI Network Agent - NLP-First Co-pilot")
+app = typer.Typer(help="Simplified AI Network Agent")
 
 
 @app.command()
 def chat():
     """Starts an interactive chat session with the network agent.
 
-    This command initializes the network workflow,
+    This command initializes the simplified network agent,
     then enters an interactive loop to process user queries. The process
-    involves LLM-based preprocessing, intent classification, and execution of
-    the appropriate agent workflow to generate responses.
+    involves LLM-based interpretation of natural language requests
+    and execution of appropriate network commands.
     """
     load_dotenv()
-    print("🤖 AI Network Agent - Interactive Chat")
+    print("🤖 Simplified AI Network Agent - Interactive Chat")
     print("=" * 60)
 
     groq_api_key = os.getenv("GROQ_API_KEY") or settings.groq_api_key
@@ -40,27 +33,17 @@ def chat():
         print("⚠️ GROQ_API_KEY not set! Please create a .env file with your key.")
         return
 
-    if not Path(settings.inventory_file).exists():
-        print(
-            f"⚠️ Inventory file '{settings.inventory_file}' not found. Please create one."
-        )
-        return
-    print(f"📦 Inventory loaded: {len(network_manager.devices)} devices found.")
-
     try:
-        workflow = NetworkWorkflow(api_key=groq_api_key)
-        print("✅ NLP layer and Agent workflow initialized successfully.")
+        agent = SimpleNetworkAgent(api_key=groq_api_key)
+        print("✅ AI agent initialized successfully.")
     except Exception as e:
         print(f"❌ Error during initialization: {e}")
         return
 
-    print(
-        "\n💡 Ask complex questions like 'show interfaces on S1' or 'show running config on R1'"
-    )
+    print("\n💡 Ask network questions like 'show interfaces on S1' or 'show version on R1'")
     print("   Type 'quit' or 'exit' to end the session.")
     print("=" * 60)
 
-    chat_history = []
     try:
         while True:
             try:
@@ -75,126 +58,22 @@ def chat():
 
             print("-" * 40)
             try:
-                # Execute Agentic Workflow with raw query (the workflow now handles NLP internally)
-                response = workflow.run(question, chat_history)
+                # Process the request with the simplified agent
+                result = agent.process_request(question)
 
-                print(f"\n🤖 Agent: {response}")
-                chat_history.append(HumanMessage(content=question))
-                chat_history.append(AIMessage(content=response))
+                print(f"\n🖥️  Device: {result['device_name']}")
+                print(f"🔍 Command: {result['command']}")
+                print(f"\n📋 Output:\n{result['output']}")
             except KeyboardInterrupt:
                 print("\n⚠️  Operation interrupted by user. Cleaning up connections...")
-                network_manager.close_all_sessions()
+                agent.close_sessions()
                 break
             except Exception as e:
                 print(f"❌ An unexpected error occurred: {e}")
             print("-" * 40)
     finally:
-        network_manager.close_all_sessions()
+        agent.close_sessions()
         print("\n👋 All network sessions closed. Goodbye!")
-
-
-@lru_cache(maxsize=1)
-def _get_cached_health_checks():
-    """Caches the health checks to avoid repeated operations."""
-    # Default set of health checks that were previously in command.yaml
-    return [
-        {"command": "show version", "description": "Device version and status"},
-        {
-            "command": "show interfaces",
-            "description": "Interface status and statistics",
-        },
-        {"command": "show ip route", "description": "Routing table information"},
-        {"command": "show processes cpu", "description": "CPU utilization"},
-        {"command": "show memory", "description": "Memory utilization"},
-    ]
-
-
-@app.command()
-def analyze():
-    """Runs a single, on-demand health analysis across all devices.
-
-    This command performs proactive health analysis by comparing current device
-    states with previously stored snapshots. It executes a series of default
-    health check commands and uses an LLM to analyze changes and determine
-    their operational significance (Critical, Warning, or Informational).
-    """
-    load_dotenv()
-    print("🤖 AI Network Agent - On-Demand Health Analysis")
-    print("=" * 60)
-
-    groq_api_key = os.getenv("GROQ_API_KEY") or settings.groq_api_key
-    if not groq_api_key:
-        print("⚠️ GROQ_API_KEY not set!")
-        return
-
-    analyzer = ProactiveAnalyzer(api_key=groq_api_key)
-
-    health_checks = _get_cached_health_checks()
-
-    if not health_checks:
-        print("❌ No health checks defined. Exiting.")
-        return
-
-    print(
-        f"📈 Analyzing {len(network_manager.devices)} devices with {len(health_checks)} checks..."
-    )
-    print("-" * 40)
-
-    _execute_health_analysis(analyzer, health_checks)
-
-    print("✅ Analysis complete.")
-
-
-def _execute_health_analysis(analyzer: ProactiveAnalyzer, health_checks: list):
-    """Execute the health analysis for all devices and health checks.
-
-    Args:
-        analyzer: The ProactiveAnalyzer instance to use for analysis
-        health_checks: List of health checks to perform
-    """
-    try:
-        for device in network_manager.devices.values():
-            print(f"Device: {device.name}")
-            _analyze_device(device, analyzer, health_checks)
-    except KeyboardInterrupt:
-        print("\n⚠️  Analysis interrupted by user. Cleaning up connections...")
-        network_manager.close_all_sessions()
-        print("❌ Analysis interrupted.")
-        return  # Exit the function early
-    finally:
-        # Ensure sessions are closed on all paths (success, error, or interrupt)
-        network_manager.close_all_sessions()
-
-
-def _analyze_device(device, analyzer: ProactiveAnalyzer, health_checks: list):
-    """Analyze a single device with all health checks.
-
-    Args:
-        device: The device to analyze
-        analyzer: The ProactiveAnalyzer instance to use for analysis
-        health_checks: List of health checks to perform
-    """
-    for check in health_checks:
-        command = check["command"]
-        try:
-            current_output = network_manager.execute_command(device.name, command)
-            current_state = {"output": current_output}
-
-            # Use the analyzer's built-in snapshot storage functionality
-            analysis = analyzer.analyze_with_snapshot_storage(
-                device.name, command, current_state
-            )
-            significance = analysis["significance"]
-            summary = analysis["summary"]
-            print(f"  - Check '{command}': [{significance}] {summary}")
-
-        except KeyboardInterrupt:
-            print("\n⚠️  Analysis interrupted by user. Cleaning up connections...")
-            network_manager.close_all_sessions()
-            print("❌ Analysis interrupted.")
-            return  # Exit the function early
-        except Exception as e:
-            print(f"  - Check '{command}': [Error] {e}")
 
 
 if __name__ == "__main__":

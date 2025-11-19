@@ -1,71 +1,58 @@
-# NLP Network Agent
+# Simplified NLP Network Agent
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **⚠️ SECURITY NOTICE: This project requires security hardening before production use. See SECURITY.md for details.**
 
-An intelligent, NLP-powered network operations co-pilot designed to bridge the gap between natural language and network device management. This agent enables network administrators to diagnose and troubleshoot network issues using everyday language instead of complex CLI commands.
+A simplified, NLP-powered network operations agent designed to bridge the gap between natural language and network device management. This agent enables network administrators to execute network commands using everyday language, powered by LangChain and Nornir.
 
 ## ✨ Key Features
 
-- **⚡ NLP-First Architecture:** Uses LLM's structured output for instant classification of user intent and extraction of entities (devices, interfaces, protocols) for faster, more reliable interactions.
-- **🧠 Multi-Agent Workflow:** Planner/Executor agent team orchestrated by LangGraph for complex, multi-step network diagnostics.
-- **📄 Structured Data Contracts:** Pydantic models ensure consistent communication between all components.
-- **💬 Conversational Interface:** Natural language interaction with conversational memory for follow-up questions.
-- **🔌 Protocol Support:** Supports traditional CLI/SSH commands via Netmiko for comprehensive device management.
-- **🛡️ Built-in Security:** Command filtering and output sanitization to prevent dangerous operations.
-- **📈 On-Demand Health Analysis:** Proactively analyzes device health by comparing current state to the last known state, using an LLM to identify significant changes.
+- **⚡ Simple NLP Integration:** Uses LangChain's structured output for direct command interpretation.
+- **🔌 Nornir-Powered:** Leverages Nornir for device inventory management, connection handling, and command execution.
+- **📄 Minimal Data Models:** Simplified Pydantic models for essential data contracts.
+- **💬 Conversational Interface:** Natural language interaction with a streamlined response system.
+- **🛡️ Basic Security:** Simple command execution with connection management.
 
 ## 🏗️ Architecture Overview
 
-The agent uses a **NLP-First** architecture that processes queries through a deterministic pre-processing step before engaging the AI workflow:
+The agent uses a **Simple NLP-to-Command** architecture:
 
 ```
-[User Input] -> [LLM Structured Output] -> [Structured Intent] -> [Intelligent Router] -> [LangGraph Workflow] -> [Response]
+[User Input] -> [LLM Structured Output] -> [Device & Command Extraction] -> [Nornir Command Execution] -> [Response]
 ```
 
 ### Core Components:
 
-1. **LLM Structured Output** - Extracts intent and entities using LLM's native tool-calling capabilities
-2. **Intelligent Router** - Handles simple queries and routes complex ones to the workflow
-3. **LangGraph Workflow** - Multi-agent system:
-   - Preprocessor Node: Uses LLM to classify intent and extract entities
-   - Planner Agent: Creates execution plans from structured intents
-   - Executor Agent: Runs network commands and tools
-   - Generator Node: Synthesizes results into responses
+1. **SimpleNetworkAgent** - Single agent that processes natural language input and executes commands
+2. **NetworkManager** - Uses Nornir for device inventory and connection management
+3. **LangChain Integration** - Direct LLM interaction with structured output for command extraction
 
 ## 📁 Project Structure
 
 ```
 .
-├── inventory.yaml        # Network device inventory
-├── main.py              # CLI entry point
-├── pyproject.toml       # Project dependencies
+├── inventory/           # Nornir inventory files
+│   ├── hosts.yaml      # Device inventory
+│   ├── groups.yaml     # Device groups
+│   ├── defaults.yaml   # Default connection settings
+│   └── config.yaml     # Nornir configuration
+├── main.py            # CLI entry point
+├── pyproject.toml     # Project dependencies
 ├── README.md
-├── SECURITY.md          # Security considerations
-├── uv.lock              # Dependency lock file
+├── SECURITY.md        # Security considerations
+├── uv.lock            # Dependency lock file
 ├── src/
-│   ├── __init__.py      # Package initialization
-│   ├── agents/          # AI agent implementations
-│   │   ├── __init__.py  # Agents package docs
-│   │   ├── analyzer.py  # Proactive analyzer for change detection
-│   │   ├── executor.py  # Tool executor for workflow operations
-│   │   └── planner.py   # Planner agent for creating execution plans
-│   ├── core/            # Core system components
-│   │   ├── __init__.py  # Core package docs
-│   │   ├── config.py    # Configuration settings
-│   │   ├── models.py    # Pydantic data models
-│   │   ├── network_manager.py  # Network device management
-│   │   └── state_manager.py   # Persistent state management
-│   ├── graph/           # Workflow orchestration
-│   │   ├── __init__.py  # Graph package docs
-│   │   └── workflow.py  # Main LangGraph workflow
-│   └── tools/           # Network operation tools
-│       ├── __init__.py  # Tools package docs
-│       ├── executor.py  # Command execution tools
-│       ├── inventory.py # Device inventory tools
-│       └── ping_tool.py # Network connectivity tools
-└── tests/               # Test suite
+│   ├── __init__.py    # Package initialization
+│   ├── agents/        # AI agent implementations
+│   │   ├── __init__.py # Agents package
+│   │   └── simple_agent.py # Simplified AI agent
+│   └── core/          # Core system components
+│       ├── __init__.py # Core package
+│       ├── config.py  # Configuration settings
+│       ├── models.py  # Simplified data models
+│       └── network_manager.py # Nornir-based network management
+└── tests/             # Test suite
 ```
 
 ## 🚀 Getting Started
@@ -95,22 +82,17 @@ Create a `.env` file in the project root:
 GROQ_API_KEY="your_groq_api_key"
 ```
 
-4. Configure your network inventory in `inventory.yaml`:
+4. Configure your network inventory in `inventory/hosts.yaml`:
 ```yaml
-devices:
-  - name: S1
-    hostname: 192.168.1.10
-    username: admin
-    password: password
-    device_type: cisco_ios
-    role: switch
-
-  - name: R1
-    hostname: 192.168.1.1
-    username: admin
-    password: password
-    device_type: cisco_ios
-    role: router
+R1:
+  hostname: 192.168.1.10
+  username: admin
+  password: admin123
+  platform: cisco_ios
+  groups: [core_routers]
+  data:
+    role: core
+    site: main
 ```
 
 ## 💻 Usage
@@ -123,54 +105,34 @@ uv run python main.py chat
 
 Example queries:
 - `show interfaces on S1`
-- `list all devices`
+- `show version on R1`
 - `show running config on R1`
-- `what is the status of the interfaces on R1?`
-
-Run a single, on-demand health analysis across all devices:
-
-```bash
-uv run python main.py analyze
-```
 
 ## 🛠️ Technical Architecture
 
 ### Core Modules
 
-- **src.core.models**: Defines Pydantic data models for structured data contracts across the application
-- **src.core.config**: Centralized configuration settings using Pydantic Settings
-- **src.core.network_manager**: Manages inventory, connections, and command execution for network devices
-- **src.core.state_manager**: Manages persistent storage of device state snapshots using SQLite
-- **src.graph.workflow**: Implements the main LangGraph workflow with Preprocessor, Planner, Executor, and Generator nodes
-- **src.agents**: Contains specific agent implementations (planner, executor, analyzer)
-- **src.tools**: Provides LangChain tools for inventory search and network command execution
+- **src.core.models**: Defines minimal Pydantic data models for the simplified application
+- **src.core.config**: Simplified configuration settings using Pydantic Settings with support for environment variables and .env files
+- **src.core.network_manager**: Nornir-based network device management
+- **src.agents.simple_agent**: Simplified AI agent that processes requests and uses Nornir for execution
 
 ### Data Flow
 
-1. **Input Processing**: User queries are processed by the LLM's structured output feature which returns structured intent containing:
-   - Query intent (get_status, get_config, find_device, etc.)
-   - Extracted entities (device names, interfaces, protocols)
-   - Sentiment analysis and ambiguity detection
+1. **Input Processing**: User queries are processed by the LLM's structured output feature which returns:
+   - Device name to execute the command on
+   - Network command to execute
 
-2. **Workflow Execution**: The NetworkWorkflow orchestrates:
-   - Planner node creates execution plan based on intent
-   - Executor node runs planned tool calls
-   - Generator node synthesizes results into human-readable response
-
-3. **State Management**: The StateManager persists device snapshots for change analysis
-
-### On-Demand Analysis
-
-The analysis feature compares current device states with historical snapshots to detect changes, categorizing them as:
-- Critical: Service-affecting changes (interface down, etc.)
-- Warning: Potential issues (increasing CPU, etc.)
-- Informational: Normal changes (uptime incrementing, etc.)
+2. **Command Execution**: The SimpleNetworkAgent:
+   - Extracts device and command using the LLM
+   - Executes the command using Nornir
+   - Returns the result to the user
 
 ## 📚 API Reference
 
 ### Command-Line Interface
 
-The agent provides a Typer-based CLI with the following commands:
+The agent provides a Typer-based CLI with the following command:
 
 #### `chat`
 Starts an interactive chat session with the network agent
@@ -178,38 +140,26 @@ Starts an interactive chat session with the network agent
 uv run python main.py chat
 ```
 
-#### `analyze`
-Runs a single, on-demand health analysis across all devices
-```
-uv run python main.py analyze
-```
-
 ### Core Classes
 
-#### `NetworkWorkflow`
-Orchestrates the multi-agent workflow for processing network queries.
+#### `SimpleNetworkAgent`
+Simple NLP agent for processing network queries.
 
 - `__init__(api_key: str)`: Initialize with Groq API key
-- `run(query: str, chat_history: List[BaseMessage]) -> str`: Execute workflow with query
+- `process_request(user_input: str) -> Dict[str, str]`: Process natural language request and return command output
 
 #### `NetworkManager`
-Manages inventory, connections, and command execution for network devices.
+Manages network device connections and command execution using Nornir.
 
-- `_load_inventory() -> Dict[str, Device]`: Load device inventory from YAML
+- `__init__(config_file: str = "inventory/config.yaml")`: Initialize with Nornir config
 - `execute_command(device_name: str, command: str) -> str`: Execute CLI command on device
 - `close_all_sessions()`: Close all active connections
 
-#### `ProactiveAnalyzer`
-Analyzes changes in network device states over time.
-
-- `analyze_with_snapshot_storage(device_name: str, command: str, new_output: dict) -> dict`: Analyze change and store new output
-- `save_snapshot(device_name: str, command: str, output: dict)`: Save device state snapshot
-
 ## 🚀 Future Roadmap
 
-- **Proactive Monitoring Service:** Evolve the `analyze` command into a continuously running service (daemon) that performs health checks on a schedule (e.g., every 15 minutes).
-- **Collaborative Alerting:** Integrate a notification service to push `Critical` or `Warning` findings from the analysis to platforms like Slack or Webex, turning the agent into a true team collaborator.
-- **gNMI Support:** Add support for gNMI (gRPC Network Management Interface) protocol to enable modern, programmatic network device management alongside traditional CLI/SSH methods.
+- **Enhanced NLP:** Add support for more complex natural language queries
+- **Multi-device Operations:** Execute commands across multiple devices simultaneously
+- **Command History:** Add history and recall functionality
 
 ## 🤝 Contributing
 

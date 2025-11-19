@@ -1,0 +1,8 @@
+---
+# Nornir Defaults
+username: admin
+password: admin
+platform: cisco_ios
+connection_options:
+  netmiko:
+    timeout: 10

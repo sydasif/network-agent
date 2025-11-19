@@ -1,107 +1,57 @@
-"""Core module for managing network device connections and commands.
+"""Simplified module for managing network device connections and commands using Nornir.
 
-This module provides the NetworkManager class which handles device inventory management,
-establishes connections to network devices, and executes commands using Netmiko (SSH/CLI).
-It includes safety features like dangerous command detection and output sanitization.
+This module provides the NetworkManager class which handles network device connections
+using Nornir and executes commands using the nornir-netmiko plugin.
 """
 
-import re
-from typing import Dict, Optional
-from typing import ClassVar
-from dataclasses import dataclass
-import yaml
-from netmiko import ConnectHandler
-from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
-
-
-@dataclass
-class Device:
-    """Represents a network device with connection details.
-
-    This data class stores all the necessary information to connect to and interact
-    with a network device, including authentication credentials and protocol information.
-
-    Attributes:
-        name (str): Unique name identifier for the device.
-        hostname (str): IP address or hostname of the device.
-        username (str): Username for device authentication.
-        password (str): Password for device authentication.
-        device_type (str): Netmiko device type (e.g., 'cisco_ios', 'cisco_xr').
-        description (str): Optional description of the device.
-        role (str): Role of the device in the network (e.g., 'access', 'distribution').
-    """
-
-    name: str
-    hostname: str
-    username: str
-    password: str
-    device_type: str
-    description: str = ""
-    role: str = ""
+from typing import Dict, List, Optional
+from nornir import InitNornir
+from nornir.core.filter import F
+from nornir_netmiko import netmiko_send_command
+from src.core.config import settings
 
 
 class NetworkManager:
-    """Manages inventory, connections, and command execution for network devices.
+    """Manages network device connections and command execution using Nornir.
 
-    The NetworkManager handles the lifecycle of network device connections, including
-    loading device inventory from configuration files, establishing connections,
-    executing commands, and managing session state. It supports multiple protocols
-    and includes security measures to prevent dangerous operations.
+    The NetworkManager handles network device connections through Nornir, which
+    provides built-in inventory management, connection handling, and parallel execution.
 
     Attributes:
-        inventory_file (str): Path to the inventory YAML file.
-        devices (Dict[str, Device]): Dictionary mapping device names to Device objects.
-        sessions (Dict[str, ConnectHandler]): Active Netmiko connections to devices.
+        nornir: The Nornir instance for managing network devices.
     """
 
-    def __init__(self, inventory_file: str | None = None):
-        """Initializes the NetworkManager and loads device inventory.
+    def __init__(self, config_file: str = "inventory/config.yaml"):
+        """Initializes the NetworkManager with Nornir.
 
         Args:
-            inventory_file (str, optional): Path to inventory file. Uses default if None.
-        """
-        from src.core.config import settings
-
-        self.inventory_file = inventory_file or settings.inventory_file
-        self.devices: Dict[str, Device] = self._load_inventory()
-        self.sessions: Dict[str, ConnectHandler] = {}
-
-    def _load_inventory(self) -> Dict[str, Device]:
-        """Loads device inventory from a YAML file.
-
-        Returns:
-            Dict[str, Device]: Dictionary mapping device names to Device objects.
+            config_file (str): Path to the Nornir configuration file.
         """
         try:
-            with open(self.inventory_file, "r") as f:
-                data = yaml.safe_load(f)
-
-            # Create Device objects without validation
-            devices = {}
-            for dev_data in data.get("devices", []):
-                devices[dev_data["name"]] = Device(**dev_data)
-
-            return devices
+            self.nornir = InitNornir(config_file=config_file)
         except Exception as e:
-            print(f"Error loading inventory: {e}")
-            return {}
+            print(f"Error initializing Nornir: {e}")
+            # Create a minimal Nornir instance with basic settings
+            self.nornir = InitNornir(
+                inventory={
+                    "plugin": "SimpleInventory",
+                    "options": {
+                        "host_file": f"{settings.nornir_inventory_dir}/hosts.yaml",
+                        "group_file": f"{settings.nornir_inventory_dir}/groups.yaml",
+                    },
+                }
+            )
 
-
-    def get_device(self, device_name: str) -> Optional[Device]:
-        """Retrieves a device by its name.
-
-        Args:
-            device_name (str): Name of the device to retrieve.
+    def get_device_names(self) -> List[str]:
+        """Returns a list of all device names in the inventory.
 
         Returns:
-            Optional[Device]: Device object if found, None otherwise.
+            List[str]: List of device names in the inventory.
         """
-        return self.devices.get(device_name)
+        return list(self.nornir.inventory.hosts.keys())
 
     def execute_command(self, device_name: str, command: str) -> str:
-        """Executes a command on a device using Netmiko.
-
-        This method routes the command execution to the Netmiko protocol handler.
+        """Executes a command on a specific device using Nornir.
 
         Args:
             device_name (str): Name of the device to execute the command on.
@@ -111,164 +61,64 @@ class NetworkManager:
             str: The output of the executed command.
 
         Raises:
-            ValueError: If the device is not found or command is dangerous.
+            ValueError: If the device is not found in inventory.
+            Exception: If command execution fails.
         """
-        device = self.get_device(device_name)
-        if not device:
+        # Filter Nornir inventory to target specific device
+        filtered_nornir = self.nornir.filter(name=device_name)
+
+        if len(filtered_nornir.inventory.hosts) == 0:
             raise ValueError(f"Device '{device_name}' not found in inventory.")
 
-        # Currently only Netmiko is supported
-        return self._execute_netmiko_command(device, command)
-
-    def _execute_netmiko_command(self, device: Device, command: str) -> str:
-        """Executes a command using Netmiko (CLI/SSH).
-
-        Establishes a connection if needed, executes the command, and sanitizes the output.
-
-        Args:
-            device (Device): The device object to execute the command on.
-            command (str): The command to execute.
-
-        Returns:
-            str: Sanitized output of the command.
-        """
-        if self._is_dangerous_command(command):
-            raise ValueError(
-                f"Execution blocked for potentially dangerous command: {command}"
-            )
-
-        session = self._get_or_create_session(device)
-        try:
-            output = session.send_command(command, read_timeout=20)
-            return self._sanitize_output(output)
-        except NetmikoTimeoutException:
-            raise ValueError(
-                f"Timeout executing command '{command}' on device {device.name}"
-            ) from None
-        except Exception as e:
-            raise ValueError(
-                f"Error executing command '{command}' on device {device.name}: {e}"
-            ) from e
-
-    def _get_or_create_session(self, device: Device) -> ConnectHandler:
-        """Gets an existing Netmiko session or creates a new one if needed.
-
-        Args:
-            device: The device object to connect to
-
-        Returns:
-            The Netmiko session (ConnectHandler instance)
-
-        Raises:
-            ValueError: If connection fails
-        """
-        if device.name not in self.sessions:
-            try:
-                self.sessions[device.name] = ConnectHandler(
-                    device_type=device.device_type,
-                    host=device.hostname,
-                    username=device.username,
-                    password=device.password,
-                    timeout=10,
-                )
-            except NetmikoTimeoutException:
-                raise ValueError(
-                    f"Timeout connecting to device {device.name}"
-                ) from None
-            except NetmikoAuthenticationException:
-                raise ValueError(
-                    f"Authentication failed for device {device.name}"
-                ) from None
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to connect to device {device.name}: {e}"
-                ) from e
-
-        return self.sessions[device.name]
-
-    # Cache compiled regex patterns to avoid recompilation
-    _DANGEROUS_PATTERNS_COMPILED: ClassVar[list] = [
-        re.compile(r"write\s+erase", re.IGNORECASE),
-        re.compile(r"reload", re.IGNORECASE),
-        re.compile(r"delete", re.IGNORECASE),
-        re.compile(r"format", re.IGNORECASE),
-        re.compile(r"configure\s+terminal", re.IGNORECASE),
-        re.compile(r"no\s+shutdown", re.IGNORECASE),
-        re.compile(r"clear", re.IGNORECASE),
-        re.compile(r"tclsh", re.IGNORECASE),  # Prevent scripting execution
-        re.compile(r"bash", re.IGNORECASE),  # Prevent shell access on some devices
-        re.compile(r"enable\s+secret", re.IGNORECASE),
-        re.compile(r"username.*secret", re.IGNORECASE),
-        re.compile(r"service.*password", re.IGNORECASE),
-        # Patterns with potential for command injection - be more specific with shell separators
-        # Only block ; and & as dangerous, allow | as it's commonly used in network commands
-        re.compile(
-            r"^[;&]", re.IGNORECASE
-        ),  # Shell command separators at start (excluding pipe)
-        re.compile(
-            r"[;&][;&|]", re.IGNORECASE
-        ),  # Multiple separators starting with ; or &
-        re.compile(r"[;&]\s*[;&|]", re.IGNORECASE),  # Multiple separators with space
-    ]
-
-    def _is_dangerous_command(self, command: str) -> bool:
-        """Checks for potentially harmful commands.
-
-        Prevents execution of commands that could damage the network infrastructure or
-        compromise security. The function uses multiple layers of validation:
-        1. Pattern matching against known dangerous commands
-        2. De-obfuscation of commands to detect character substitution (e.g., "w r i t e")
-        3. Validation of shell command separators that could enable injection attacks
-
-        Args:
-            command (str): The command to check.
-
-        Returns:
-            bool: True if the command is dangerous, False otherwise.
-        """
-        command_lower = command.lower().strip()
-
-        # Additional validation: check for potentially encoded dangerous commands
-        # Convert common substitutions back to check for dangerous patterns
-        sanitized_command = command_lower
-        # Common character substitutions in commands (e.g., "w r i t e" for "write")
-        sanitized_command = re.sub(
-            r"\s+", "", sanitized_command
-        )  # Remove internal spaces
-        # Add more deobfuscation patterns as needed
-
-        # Check both original and sanitized versions
-        return any(
-            pattern.search(command_lower) or pattern.search(sanitized_command)
-            for pattern in self._DANGEROUS_PATTERNS_COMPILED
+        # Execute command using Nornir's netmiko plugin
+        result = filtered_nornir.run(
+            task=netmiko_send_command,
+            command_string=command
         )
 
-    def _sanitize_output(self, output: str) -> str:
-        """Removes sensitive information from CLI output.
+        # Get the result for the specific host
+        host_result = result[device_name]
 
-        This method redacts passwords and secrets from command output for security.
+        if host_result.failed:
+            raise Exception(f"Command execution failed: {host_result.result}")
+
+        return host_result.result
+
+    def execute_command_on_multiple_devices(self, device_names: List[str], command: str) -> Dict[str, str]:
+        """Executes a command on multiple devices.
 
         Args:
-            output (str): The raw command output.
+            device_names (List[str]): List of device names to execute the command on.
+            command (str): The command to execute on the devices.
 
         Returns:
-            str: Sanitized output with sensitive information redacted.
+            Dict[str, str]: Dictionary mapping device names to command outputs.
         """
-        # Simplified for brevity; a production version would be more robust.
-        output = re.sub(
-            r"password\s+\S+", "password [REDACTED]", output, flags=re.IGNORECASE
+        # Filter Nornir inventory to target specific devices
+        filtered_nornir = self.nornir.filter(name=device_names)
+
+        # Execute command using Nornir's netmiko plugin
+        results = filtered_nornir.run(
+            task=netmiko_send_command,
+            command_string=command
         )
-        output = re.sub(
-            r"secret\s+\S+", "secret [REDACTED]", output, flags=re.IGNORECASE
-        )
-        return output
+
+        outputs = {}
+        for device_name in device_names:
+            if device_name in results:
+                host_result = results[device_name]
+                if not host_result.failed:
+                    outputs[device_name] = host_result.result
+                else:
+                    outputs[device_name] = f"Error: {host_result.result}"
+
+        return outputs
 
     def close_all_sessions(self):
-        """Closes all active Netmiko sessions.
+        """Closes all active Nornir sessions.
 
         This method ensures all connections are properly closed when the manager is shut down.
         """
-        for session in self.sessions.values():
-            if session.is_alive():
-                session.disconnect()
-        self.sessions.clear()
+        # Nornir typically manages connections automatically,
+        # but we can disconnect all connections
+        self.nornir.close_connections()
