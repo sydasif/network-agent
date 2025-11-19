@@ -16,7 +16,7 @@ dependencies = [
     "typer>=0.20.0",
     "pydantic-settings>=2.12.0",
     "pip>=25.3",
-    "urllib3>=2.5.0",                     # Updated for security
+    "urllib3>=2.5.0",
     "pytest>=9.0.1",
 ]
 
@@ -29,7 +29,7 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "W", "F", "C", "B", "RET", "RUF"]
 extend-ignore = [
-    "E501", # Line length - handled through other mechanisms
+    "E501",
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -1,74 +1,38 @@
-# Simplified NLP Network Agent
+# AI Network Agent
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+AI Network Agent is a command-line interface tool that allows network administrators to interact with network devices using natural language commands. The system leverages a Large Language Model (LLM) to interpret user requests and execute appropriate commands on network devices.
 
-**⚠️ SECURITY NOTICE: This project requires security hardening before production use. See SECURITY.md for details.**
+## Table of Contents
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [API Reference](#api-reference)
+- [Architecture](#architecture)
+- [FAQ](#faq)
 
-A simplified, NLP-powered network operations agent designed to bridge the gap between natural language and network device management. This agent enables network administrators to execute network commands using everyday language, powered by LangChain and Nornir.
+## Features
 
-## ✨ Key Features
+- Interpret natural language commands for network devices
+- Execute commands on multiple network devices simultaneously
+- Interactive chat interface for real-time interaction
+- Support for various network device platforms
+- Secure credential management
 
-- **⚡ Simple NLP Integration:** Uses LangChain's structured output for direct command interpretation.
-- **🔌 Nornir-Powered:** Leverages Nornir for device inventory management, connection handling, and command execution.
-- **📄 Minimal Data Models:** Simplified Pydantic models for essential data contracts.
-- **💬 Conversational Interface:** Natural language interaction with a streamlined response system.
-- **🛡️ Basic Security:** Simple command execution with connection management.
+## Prerequisites
 
-## 🏗️ Architecture Overview
+- Python 3.12 or higher
+- [GROQ API key](https://console.groq.com/) for LLM processing
+- Network devices accessible via SSH
+- Git for version control
 
-The agent uses a **Simple NLP-to-Command** architecture:
-
-```
-[User Input] -> [LLM Structured Output] -> [Device & Command Extraction] -> [Nornir Command Execution] -> [Response]
-```
-
-### Core Components:
-
-1. **SimpleNetworkAgent** - Single agent that processes natural language input and executes commands
-2. **NetworkManager** - Uses Nornir for device inventory and connection management
-3. **LangChain Integration** - Direct LLM interaction with structured output for command extraction
-
-## 📁 Project Structure
-
-```
-.
-├── inventory/           # Nornir inventory files
-│   ├── hosts.yaml      # Device inventory
-│   ├── groups.yaml     # Device groups
-│   ├── defaults.yaml   # Default connection settings
-│   └── config.yaml     # Nornir configuration
-├── main.py            # CLI entry point
-├── pyproject.toml     # Project dependencies
-├── README.md
-├── SECURITY.md        # Security considerations
-├── uv.lock            # Dependency lock file
-├── src/
-│   ├── __init__.py    # Package initialization
-│   ├── agents/        # AI agent implementations
-│   │   ├── __init__.py # Agents package
-│   │   └── simple_agent.py # Simplified AI agent
-│   └── core/          # Core system components
-│       ├── __init__.py # Core package
-│       ├── config.py  # Configuration settings
-│       ├── models.py  # Simplified data models
-│       └── network_manager.py # Nornir-based network management
-└── tests/             # Test suite
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.12+
-- Network device access via SSH
-- Groq API key for LLM access
-
-### Installation
+## Installation
 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd nlp-network-agent
+cd net-agent
 ```
 
 2. Install dependencies using uv:
@@ -76,104 +40,163 @@ cd nlp-network-agent
 uv sync
 ```
 
-3. Set up environment:
-Create a `.env` file in the project root:
-```
-GROQ_API_KEY="your_groq_api_key"
-```
-
-4. Configure your network inventory in `inventory/hosts.yaml`:
-```yaml
-R1:
-  hostname: 192.168.1.10
-  username: admin
-  password: admin123
-  platform: cisco_ios
-  groups: [core_routers]
-  data:
-    role: core
-    site: main
-```
-
-## 💻 Usage
-
-Start an interactive chat session:
-
+3. Activate the virtual environment:
 ```bash
-uv run python main.py chat
+source .venv/bin/activate
 ```
 
-Example queries:
-- `show interfaces on S1`
-- `show version on R1`
-- `show running config on R1`
+## Configuration
 
-## 🛠️ Technical Architecture
-
-### Core Modules
-
-- **src.core.models**: Defines minimal Pydantic data models for the simplified application
-- **src.core.config**: Simplified configuration settings using Pydantic Settings with support for environment variables and .env files
-- **src.core.network_manager**: Nornir-based network device management
-- **src.agents.simple_agent**: Simplified AI agent that processes requests and uses Nornir for execution
-
-### Data Flow
-
-1. **Input Processing**: User queries are processed by the LLM's structured output feature which returns:
-   - Device name to execute the command on
-   - Network command to execute
-
-2. **Command Execution**: The SimpleNetworkAgent:
-   - Extracts device and command using the LLM
-   - Executes the command using Nornir
-   - Returns the result to the user
-
-## 📚 API Reference
-
-### Command-Line Interface
-
-The agent provides a Typer-based CLI with the following command:
-
-#### `chat`
-Starts an interactive chat session with the network agent
-```
-uv run python main.py chat
+1. Create a `.env` file in the project root:
+```bash
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-### Core Classes
+2. Configure your network inventory in the `inventory/` directory:
+   - `hosts.yaml`: Define your network devices
+   - `groups.yaml`: Group devices by function or location
+   - `defaults.yaml`: Set default credentials and platform settings
+
+Example `inventory/hosts.yaml`:
+```yaml
+---
+R1:
+  hostname: 192.168.121.101
+
+R2:
+  hostname: 192.168.121.102
+
+S1:
+  hostname: 192.168.121.103
+
+S2:
+  hostname: 192.168.121.104
+```
+
+Example `inventory/defaults.yaml`:
+```yaml
+---
+username: admin
+password: admin
+platform: cisco_ios
+connection_options:
+  netmiko:
+    timeout: 10
+```
+
+## Usage
+
+Start the interactive chat session:
+```bash
+uv run main.py chat
+```
+
+Example commands you can use:
+- "Show interfaces on R1"
+- "Display IP configuration on S1"
+- "Check routing table on R2"
+- "Show version on all devices"
+
+To exit the chat session, type "quit" or "exit".
+
+## API Reference
+
+### Main Module (`main.py`)
+
+#### `chat()`
+Starts an interactive chat session with the network agent. This function initializes the SimpleNetworkAgent with the GROQ API key, then enters an interactive loop to process user queries. The process involves LLM-based interpretation of natural language requests and execution of appropriate network commands on the specified devices.
+
+### Agent Module (`src/agents/simple_agent.py`)
 
 #### `SimpleNetworkAgent`
-Simple NLP agent for processing network queries.
+A simplified AI agent for network command execution. This agent takes natural language input, determines the appropriate network command to execute, and uses Nornir to execute it on the specified device.
 
-- `__init__(api_key: str)`: Initialize with Groq API key
-- `process_request(user_input: str) -> Dict[str, str]`: Process natural language request and return command output
+##### `__init__(self, api_key: str)`
+Initialize the agent with an LLM instance.
+
+###### Parameters:
+- `api_key`: The API key for the Groq LLM service
+
+##### `process_request(self, user_input: str) -> Dict[str, str]`
+Process a natural language request and execute the appropriate command.
+
+###### Parameters:
+- `user_input`: Natural language request from the user
+
+###### Returns:
+- Dictionary with device name, command, and output
+
+##### `close_sessions(self)`
+Close all network sessions.
+
+#### `NetworkCommand`
+Model for extracted network command information.
+
+### Network Manager Module (`src/core/network_manager.py`)
 
 #### `NetworkManager`
 Manages network device connections and command execution using Nornir.
 
-- `__init__(config_file: str = "inventory/config.yaml")`: Initialize with Nornir config
-- `execute_command(device_name: str, command: str) -> str`: Execute CLI command on device
-- `close_all_sessions()`: Close all active connections
+##### `__init__(self, config_file: str = "inventory/config.yaml")`
+Initializes the NetworkManager with Nornir.
 
-## 🚀 Future Roadmap
+###### Parameters:
+- `config_file` (str): Path to the Nornir configuration file.
 
-- **Enhanced NLP:** Add support for more complex natural language queries
-- **Multi-device Operations:** Execute commands across multiple devices simultaneously
-- **Command History:** Add history and recall functionality
+##### `get_device_names(self) -> List[str]`
+Returns a list of all device names in the inventory.
 
-## 🤝 Contributing
+###### Returns:
+- List[str]: List of device names in the inventory.
 
-This project follows modern Python best practices:
+##### `execute_command(self, device_name: str, command: str) -> str`
+Executes a command on a specific device using Nornir.
 
-- Dependency management with `uv`
-- Code formatting with `ruff`
-- Type checking and linting with `ruff`
+###### Parameters:
+- `device_name` (str): Name of the device to execute the command on.
+- `command` (str): The command to execute on the device.
 
-Before submitting changes:
-1. Run `ruff check --fix . && ruff format .` to format code
-2. Run tests to ensure functionality
-3. Add documentation for new features
+###### Returns:
+- str: The output of the executed command.
 
-## 📄 License
+###### Raises:
+- ValueError: If the device is not found in inventory.
+- Exception: If command execution fails.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+##### `execute_command_on_multiple_devices(self, device_names: List[str], command: str) -> Dict[str, str]`
+Executes a command on multiple devices.
+
+###### Parameters:
+- `device_names` (List[str]): List of device names to execute the command on.
+- `command` (str): The command to execute on the devices.
+
+###### Returns:
+- Dict[str, str]: Dictionary mapping device names to command outputs.
+
+##### `close_all_sessions(self)`
+Closes all active Nornir sessions.
+
+## Architecture
+
+The system is organized into the following components:
+
+- `main.py`: The entry point for the CLI application, providing an interactive chat interface.
+- `src/agents/simple_agent.py`: Contains the AI agent that processes natural language requests and executes commands.
+- `src/core/network_manager.py`: Handles network device connections and command execution.
+- `src/core/config.py`: Application configuration management using Pydantic Settings.
+- `src/core/models.py`: Data models for the application using Pydantic.
+- `tests/`: Contains unit tests for the application components.
+
+## FAQ
+
+### How does the AI agent work?
+The agent uses a Large Language Model (GROQ API) to interpret natural language commands. It identifies the target device and the command to execute, then uses Nornir to connect to the device and run the command.
+
+### What network devices are supported?
+The system supports any network device that is compatible with Netmiko, including most Cisco, Juniper, Arista, and other vendor devices.
+
+### Is my API key secure?
+Your GROQ API key is stored in the `.env` file and is not committed to the repository. Ensure proper file permissions are set to protect this file.
+
+### Can I execute commands on multiple devices at once?
+Currently, the interactive chat supports commands on a single device. The underlying NetworkManager supports multi-device commands through its API.

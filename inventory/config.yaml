@@ -1,5 +1,4 @@
 ---
-# Nornir Configuration
 inventory:
   plugin: SimpleInventory
   options:

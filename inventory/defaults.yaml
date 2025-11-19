@@ -1,5 +1,4 @@
 ---
-# Nornir Defaults
 username: admin
 password: admin
 platform: cisco_ios

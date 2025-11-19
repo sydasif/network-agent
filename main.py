@@ -1,7 +1,9 @@
-"""Simplified main entry point for the AI Network Agent using Typer for a clean CLI.
+"""Main entry point for the AI Network Agent CLI application.
 
-This module serves as the entry point for the simplified application, providing
-a 'chat' command for interactive sessions with the AI network agent.
+This module provides a command-line interface for interacting with network devices
+using natural language commands. It uses the Typer framework for CLI functionality
+and integrates with a SimpleNetworkAgent to process user requests and execute
+network commands on specified devices.
 """
 
 import os
@@ -11,18 +13,17 @@ from src.agents.simple_agent import SimpleNetworkAgent
 from src.core.config import settings
 
 
-# Create a Typer app
-app = typer.Typer(help="Simplified AI Network Agent")
+app = typer.Typer()
 
 
 @app.command()
 def chat():
     """Starts an interactive chat session with the network agent.
 
-    This command initializes the simplified network agent,
+    This function initializes the SimpleNetworkAgent with the GROQ API key,
     then enters an interactive loop to process user queries. The process
     involves LLM-based interpretation of natural language requests
-    and execution of appropriate network commands.
+    and execution of appropriate network commands on the specified devices.
     """
     load_dotenv()
     print("🤖 Simplified AI Network Agent - Interactive Chat")
@@ -47,31 +48,39 @@ def chat():
     try:
         while True:
             try:
+                # Get user input for network command
                 question = input("\n💬 You: ").strip()
             except (KeyboardInterrupt, EOFError):
+                # Handle user interruption gracefully
                 break
 
             if not question:
+                # Skip empty input
                 continue
-            if question.lower() in ["quit", "exit"]:
+            question_lower = question.lower()
+            if question_lower in ["quit", "exit"]:
+                # Break the loop if user wants to exit
                 break
 
             print("-" * 40)
             try:
-                # Process the request with the simplified agent
+                # Process the natural language request and execute command on device
                 result = agent.process_request(question)
 
                 print(f"\n🖥️  Device: {result['device_name']}")
                 print(f"🔍 Command: {result['command']}")
                 print(f"\n📋 Output:\n{result['output']}")
             except KeyboardInterrupt:
+                # Handle interruption during command execution
                 print("\n⚠️  Operation interrupted by user. Cleaning up connections...")
                 agent.close_sessions()
                 break
             except Exception as e:
+                # Handle any other errors during command processing
                 print(f"❌ An unexpected error occurred: {e}")
             print("-" * 40)
     finally:
+        # Ensure all network sessions are closed even if an error occurs
         agent.close_sessions()
         print("\n👋 All network sessions closed. Goodbye!")
 
