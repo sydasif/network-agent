@@ -6,8 +6,6 @@ devices or list all available devices in the inventory.
 """
 
 from typing import List
-import ipaddress
-import re
 from langchain_core.tools import tool
 from src.core.models import DeviceInfo
 from src.core.network_manager import NetworkManager
@@ -17,37 +15,6 @@ from src.core.config import settings
 network_manager = NetworkManager(settings.inventory_file)
 
 
-def validate_inventory(device_info: dict) -> None:
-    """Validates a device's inventory entry.
-
-    Checks for valid IP format, connection type, and required credentials.
-
-    Args:
-        device_info (dict): Device information from the inventory
-
-    Raises:
-        ValueError: If validation fails
-    """
-    # Validate connection type
-    connection = device_info.get(
-        "device_type", ""
-    )  # Using device_type as the connection type
-    # Netmiko device types are what we use, so we validate against known types
-    if not connection:
-        raise ValueError("Missing device_type in inventory")
-
-    # Validate IP address format
-    ip = device_info.get("hostname")
-    if ip:
-        try:
-            ipaddress.ip_address(ip)
-        except Exception:
-            # Check if it's a valid hostname (not just IP)
-            if not re.match(
-                r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9])*$",
-                ip,
-            ):
-                raise ValueError("Invalid IP address or hostname format") from None
 
 
 @tool

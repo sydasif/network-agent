@@ -1,7 +1,6 @@
 """Tests for the ProactiveAnalyzer class."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from src.agents.analyzer import ProactiveAnalyzer
 
 

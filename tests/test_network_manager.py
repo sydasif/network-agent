@@ -1,7 +1,6 @@
 """Tests for the NetworkManager class."""
 
-import pytest
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import patch, mock_open
 from src.core.network_manager import NetworkManager, Device
 
 
@@ -86,37 +85,6 @@ class TestNetworkManager:
         assert devices["device1"].name == "device1"
         assert devices["device1"].hostname == "192.168.1.1"
 
-    def test_validate_device_missing_required_field(self):
-        """Test validation with missing required field."""
-        network_manager = NetworkManager()
-
-        dev_data = {
-            "name": "device1",
-            "hostname": "192.168.1.1",
-            # Missing username, password, and device_type
-        }
-
-        with pytest.raises(ValueError, match="Missing required field"):
-            network_manager._validate_device(dev_data)
-
-    def test_validate_device_with_valid_data(self):
-        """Test validation with valid device data."""
-        network_manager = NetworkManager()
-
-        dev_data = {
-            "name": "device1",
-            "hostname": "192.168.1.1",
-            "username": "admin",
-            "password": "password",
-            "device_type": "cisco_ios",
-        }
-
-        # Should not raise an exception
-        try:
-            network_manager._validate_device(dev_data)
-            assert True  # If no exception, validation passed
-        except ValueError:
-            assert False, "Validation failed for valid device data"
 
     def test_is_dangerous_command_safe_command(self):
         """Test identifying safe commands."""
